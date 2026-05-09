@@ -1,0 +1,36 @@
+{
+	"name": "@bkircher/pi-web-tools",
+	"version": "0.1.0",
+	"keywords": [
+		"pi-package"
+	],
+	"type": "module",
+	"scripts": {
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc"
+	},
+	"files": [
+		"extensions"
+	],
+	"pi": {
+		"extensions": [
+			"./extensions"
+		]
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"typebox": "*"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.14",
+		"typescript": "^6.0.3"
+	},
+	"description": "web_search tool using DuckDuckGo HTML search and Node fetch",
+	"author": "bkircher@0xadd.de",
+	"license": "MIT"
+}

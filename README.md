@@ -1,7 +1,7 @@
 # pi-web-tools
 
-A pi extension that adds the `web_search` with DuckDuckGo and `web_fetch` with
-[Obscura](https://github.com/h4ckf0r0day/obscura) headless-browser tools for
+A pi extension that adds the `web_search` DuckDuckGo tool and the `web_fetch`
+[Obscura](https://github.com/h4ckf0r0day/obscura) headless-browser tool to the
 [pi](https://github.com/earendil-works/pi) coding agent.
 
 ## Tools
@@ -41,8 +41,8 @@ Behavior:
 - Does not expose `--dump original`; binary/raw downloads should be handled by a
   separate download tool.
 - Always passes `--stealth` to Obscura.
-- Always passes `--wait` to Obscura. The default post-navigation settle wait is
-  5 seconds; set `wait` to 0 to disable it.
+- Always passes `--wait` to Obscura. The default post-navigation wait is 5
+  seconds; set `wait` to 0 to disable it.
 
 Parameters:
 
@@ -54,7 +54,7 @@ Parameters:
   - `text`
   - `html`
   - `links`
-  - `assets`: NDJSON sub-resource URLs from the rendered page.
+  - `assets`: NDJSON subresource URLs from the rendered page.
 - `eval`: optional JavaScript expression evaluated in the rendered page instead
   of dumping page content.
 - `selector`: optional CSS selector to wait for before dumping output. Not valid
@@ -62,7 +62,7 @@ Parameters:
 - `waitUntil`: optional readiness condition: `load` (default),
   `domcontentloaded`, `networkidle0`, or `networkidle2`.
 - `wait`: optional extra wait after navigation, in seconds. Defaults to 5;
-  maximum 60. Set to 0 to disable the post-navigation settle wait.
+  maximum 60. Set to 0 to disable the post-navigation wait.
 - `timeout`: optional navigation timeout in seconds. Defaults to 30; valid range
   1-120.
 - `proxy`: optional HTTP or SOCKS proxy URL passed to Obscura.
@@ -71,8 +71,8 @@ Output limits:
 
 - Tool output returned to the model is truncated to pi's standard limit: 2000
   lines or 50.0KB, whichever comes first.
-- If output is truncated, the full Obscura output is left in a per-user temp
-  file and the path is included in the tool result.
+- If output is truncated, the full Obscura output is left in a per-user
+  temporary file and the path is included in the tool result.
 - If the Obscura output is larger than 10 MiB, the tool reads only a small
   preview and keeps the full output file.
 
@@ -81,28 +81,27 @@ Usage guidance:
 - Use `web_search` to find candidate URLs.
 - Use `web_fetch` when the URL is already known or after selecting a search
   result.
-- Use `dump=markdown` for most reading/summarization tasks.
+- Use `dump=markdown` for most reading or summarization tasks.
 - Use `dump=html` only when markup matters.
 - Use `dump=links` for page link extraction.
-- Use `dump=assets` for rendered sub-resource URLs.
+- Use `dump=assets` for rendered subresource URLs.
 
 ## Known issues
 
-We are using Obscura in `--stealth` mode and this disables checking for private
-and internal addresses that can be used for exfiltration.
+This extension uses Obscura in `--stealth` mode, which disables checking for
+private and internal addresses that can be used for exfiltration.
 
 - Host checks are a preflight step only; redirects or later DNS changes can
-  still point Obscura at a different address. (We want to support redirects but
-  should check them again.)
+  still point Obscura at a different address. Redirect targets should be checked
+  separately.
 - Reserved-name coverage is not exhaustive; some special-use hostnames and
-  IPv4-mapped IPv6 reserved ranges may not be rejected. (I think, this will
-  always be incomplete.)
+  IPv4-mapped IPv6 reserved ranges may not be rejected. Complete coverage is
+  difficult to guarantee.
 - Sensitive URL detection is heuristic; token-like values hidden inside encoded
-  nested URLs may be missed. (Same.)
+  nested URLs may be missed. Complete detection is difficult to guarantee.
 
-We should run pi in a sandbox-exec(1) with Little Snitch (or something or
-otherwise isolate from private data and infrastructure) to avoid exfiltration
-attacks.
+Run pi in `sandbox-exec(1)` with Little Snitch, or otherwise isolate it from
+private data and infrastructure, to reduce the risk of exfiltration attacks.
 
 ## Links
 

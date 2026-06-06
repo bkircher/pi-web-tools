@@ -1,6 +1,8 @@
 # pi-web-tools
 
-A pi extension that adds the `web_search` and `web_fetch` tools.
+A pi extension that adds the `web_search` with DuckDuckGo and `web_fetch` with
+[Obscura](https://github.com/h4ckf0r0day/obscura) headless-browser tools for
+[pi](https://github.com/earendil-works/pi) coding agent.
 
 ## Tools
 

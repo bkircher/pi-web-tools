@@ -1,4 +1,5 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { decode } from "html-entities";
 import { Type } from "typebox";
 
 export type SearchResult = {
@@ -87,40 +88,17 @@ function makeSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSi
 	return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 }
 
-function decodeHtmlEntities(value: string): string {
-	const named: Record<string, string> = {
-		amp: "&",
-		lt: "<",
-		gt: ">",
-		quot: '"',
-		apos: "'",
-		nbsp: " ",
-	};
-
-	return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (entity, body: string) => {
-		if (body[0] === "#") {
-			const radix = body[1]?.toLowerCase() === "x" ? 16 : 10;
-			const raw = radix === 16 ? body.slice(2) : body.slice(1);
-			const codePoint = Number.parseInt(raw, radix);
-			if (Number.isFinite(codePoint)) {
-				try {
-					return String.fromCodePoint(codePoint);
-				} catch {
-					return entity;
-				}
-			}
-			return entity;
-		}
-
-		return named[body.toLowerCase()] ?? entity;
-	});
+function decodeHtmlEntities(value: string, scope: "body" | "attribute" = "body"): string {
+	return decode(value, { level: "html5", scope });
 }
 
 function textFromHtml(html: string): string {
-	return decodeHtmlEntities(html)
-		.replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-		.replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-		.replace(/<[^>]*>/g, " ")
+	return decodeHtmlEntities(
+		html
+			.replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+			.replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+			.replace(/<[^>]*>/g, " "),
+	)
 		.replace(/\s+/g, " ")
 		.trim();
 }
@@ -129,7 +107,7 @@ function getAttribute(tag: string, name: string): string | undefined {
 	const pattern = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
 	const match = tag.match(pattern);
 	const raw = match?.[1] ?? match?.[2] ?? match?.[3];
-	return raw ? decodeHtmlEntities(raw) : undefined;
+	return raw ? decodeHtmlEntities(raw, "attribute") : undefined;
 }
 
 function unwrapDuckDuckGoUrl(href: string): string | undefined {

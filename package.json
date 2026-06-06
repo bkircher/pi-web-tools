@@ -32,5 +32,8 @@
 	},
 	"description": "Provides web_search and web_fetch tools to pi",
 	"author": "bkircher@0xadd.de",
-	"license": "MIT"
+	"license": "MIT",
+	"dependencies": {
+		"html-entities": "^2.6.0"
+	}
 }

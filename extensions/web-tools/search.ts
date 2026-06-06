@@ -23,6 +23,7 @@ export type WebSearchDetails = {
 };
 
 const SEARCH_URL = "https://html.duckduckgo.com/html/";
+const SEARCH_HOSTNAME = new URL(SEARCH_URL).hostname;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
@@ -215,6 +216,18 @@ async function readDuckDuckGoHtml(response: Response): Promise<string> {
 	return html;
 }
 
+function isRedirectStatus(status: number): boolean {
+	return status >= 300 && status < 400;
+}
+
+function getRedirectHostname(location: string, baseUrl: URL): string | undefined {
+	try {
+		return new URL(location, baseUrl).hostname;
+	} catch {
+		return undefined;
+	}
+}
+
 async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefined): Promise<string> {
 	const url = new URL(SEARCH_URL);
 	url.searchParams.set("q", query);
@@ -227,13 +240,17 @@ async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefine
 			"accept-language": "en-US,en;q=0.9",
 			"user-agent": "Mozilla/5.0",
 		},
-		redirect: "follow",
+		redirect: "manual",
 		signal: makeSignal(signal, 10_000),
 	});
 
-	const finalUrl = new URL(response.url);
-	if (finalUrl.hostname !== "html.duckduckgo.com") {
-		throw new Error(`DuckDuckGo search redirected to unexpected host: ${finalUrl.hostname}`);
+	if (isRedirectStatus(response.status)) {
+		const location = response.headers.get("location");
+		const redirectHostname = location ? getRedirectHostname(location, url) : undefined;
+		if (redirectHostname && redirectHostname !== SEARCH_HOSTNAME) {
+			throw new Error(`DuckDuckGo search redirected to unexpected host: ${redirectHostname}`);
+		}
+		throw new Error(`DuckDuckGo search redirected unexpectedly: HTTP ${response.status}`);
 	}
 
 	if (!response.ok) {

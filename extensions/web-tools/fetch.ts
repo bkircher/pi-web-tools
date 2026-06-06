@@ -252,8 +252,8 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 				let output: { text: string; bytes: number; tooLarge: boolean };
 				try {
 					output = await readObscuraOutput(outputPath);
-				} catch (error) {
-					if (!result.stdout) throw error;
+				} catch {
+					if (!result.stdout) throw new Error(`obscura fetch produced no readable output at ${outputPath}`);
 					output = {
 						text: result.stdout,
 						bytes: Buffer.byteLength(result.stdout, "utf8"),

@@ -33,6 +33,11 @@ Behavior:
   rendered page content.
 - Obscura's private-network protection remains enabled by default; this tool
   does not pass `--allow-private-network`.
+- Rejects localhost/special-use hostnames, private or reserved IP literals, and
+  hostnames that resolve to private or reserved IP addresses before invoking
+  Obscura.
+- Rejects URLs containing userinfo credentials or query/fragment fields that
+  look like credentials or tokens.
 - Does not expose `--dump original`; binary/raw downloads should be handled by a
   separate download tool.
 - Always passes `--stealth` to Obscura.
@@ -41,7 +46,9 @@ Behavior:
 
 Parameters:
 
-- `url`: required URL with an `http://` or `https://` scheme.
+- `url`: required public URL with an `http://` or `https://` scheme. Local or
+  private-network hosts, userinfo credentials, and sensitive query/fragment
+  tokens are rejected.
 - `dump`: optional output format when `eval` is not used:
   - `markdown` (default)
   - `text`
@@ -78,6 +85,24 @@ Usage guidance:
 - Use `dump=html` only when markup matters.
 - Use `dump=links` for page link extraction.
 - Use `dump=assets` for rendered sub-resource URLs.
+
+## Known issues
+
+We are using Obscura in `--stealth` mode and this disables checking for private
+and internal addresses that can be used for exfiltration.
+
+- Host checks are a preflight step only; redirects or later DNS changes can
+  still point Obscura at a different address. (We want to support redirects but
+  should check them again.)
+- Reserved-name coverage is not exhaustive; some special-use hostnames and
+  IPv4-mapped IPv6 reserved ranges may not be rejected. (I think, this will
+  always be incomplete.)
+- Sensitive URL detection is heuristic; token-like values hidden inside encoded
+  nested URLs may be missed. (Same.)
+
+We should run pi in a sandbox-exec(1) with Little Snitch (or something or
+otherwise isolate from private data and infrastructure) to avoid exfiltration
+attacks.
 
 ## Links
 

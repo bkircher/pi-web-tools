@@ -30,7 +30,7 @@
 		"@biomejs/biome": "2.4.14",
 		"typescript": "^6.0.3"
 	},
-	"description": "web_search tool using DuckDuckGo HTML search and Node fetch",
+	"description": "Provides web_search and web_fetch tools to pi",
 	"author": "bkircher@0xadd.de",
 	"license": "MIT"
 }

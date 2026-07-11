@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
-import { mkdtemp, open, readFile, rm, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { BlockList, isIP } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,9 +12,9 @@ import {
 	type AgentToolResult,
 	type ExtensionAPI,
 	type TruncationResult,
-	truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { scanOutput, type ScannedOutput } from "./output.js";
 
 const WEB_FETCH_DUMP_MODES = ["markdown", "text", "html", "links", "assets"] as const;
 const WEB_FETCH_WAIT_UNTIL_VALUES = ["load", "domcontentloaded", "networkidle0", "networkidle2"] as const;
@@ -52,7 +53,6 @@ const MAX_WEB_FETCH_URL_LENGTH = 4096;
 const MAX_WEB_FETCH_EVAL_LENGTH = 5000;
 const MAX_WEB_FETCH_SELECTOR_LENGTH = 1000;
 const MAX_WEB_FETCH_PROXY_LENGTH = 2048;
-const MAX_WEB_FETCH_CAPTURE_BYTES = 10 * 1024 * 1024;
 
 type IpVersion = "ipv4" | "ipv6";
 
@@ -337,28 +337,8 @@ function createWebFetchTempDir(): Promise<string> {
 	return mkdtemp(join(tmpdir(), "pi-web-fetch-"));
 }
 
-async function readObscuraOutput(outputPath: string): Promise<{ text: string; bytes: number; tooLarge: boolean }> {
-	const outputStats = await stat(outputPath);
-	if (outputStats.size <= MAX_WEB_FETCH_CAPTURE_BYTES) {
-		return {
-			text: await readFile(outputPath, "utf8"),
-			bytes: outputStats.size,
-			tooLarge: false,
-		};
-	}
-
-	const file = await open(outputPath, "r");
-	try {
-		const buffer = Buffer.alloc(DEFAULT_MAX_BYTES);
-		const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
-		return {
-			text: buffer.subarray(0, bytesRead).toString("utf8"),
-			bytes: outputStats.size,
-			tooLarge: true,
-		};
-	} finally {
-		await file.close();
-	}
+function readObscuraOutput(outputPath: string): Promise<ScannedOutput> {
+	return scanOutput(createReadStream(outputPath));
 }
 
 function makeUtf8PrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
@@ -452,27 +432,20 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 					);
 				}
 
-				let output: { text: string; bytes: number; tooLarge: boolean };
+				let output: ScannedOutput;
 				try {
 					output = await readObscuraOutput(outputPath);
 				} catch {
 					if (!result.stdout) throw new Error(`obscura fetch produced no readable output at ${outputPath}`);
-					output = {
-						text: result.stdout,
-						bytes: Buffer.byteLength(result.stdout, "utf8"),
-						tooLarge: false,
-					};
+					output = await scanOutput([Buffer.from(result.stdout)]);
 				}
 
-				const truncation = truncateHead(output.text, {
-					maxLines: DEFAULT_MAX_LINES,
-					maxBytes: DEFAULT_MAX_BYTES,
-				});
+				const { truncation } = output;
 				const firstLinePreview = truncation.firstLineExceedsLimit
 					? makeUtf8PrefixPreview(output.text, DEFAULT_MAX_BYTES)
 					: undefined;
 				const stderr = result.stderr.trim();
-				const truncated = output.tooLarge || truncation.truncated;
+				const truncated = truncation.truncated;
 				keepTempDir = truncated;
 
 				const commonDetails: WebFetchBaseDetails = {
@@ -495,12 +468,7 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 
 				let text = firstLinePreview?.content ?? truncation.content;
 				if (!text) text = "No content returned.";
-				if (output.tooLarge) {
-					const shownBytes = firstLinePreview?.bytes ?? truncation.outputBytes;
-					text += `\n\n[Output truncated: output is ${formatSize(output.bytes)}, which exceeds the ${formatSize(MAX_WEB_FETCH_CAPTURE_BYTES)} in-memory capture limit.`;
-					text += ` Showing the first ${formatSize(shownBytes)} available to the tool.`;
-					text += ` Full output saved to: ${outputPath}]`;
-				} else if (firstLinePreview) {
+				if (firstLinePreview) {
 					text += `\n\n[Output truncated: first line exceeds the ${formatSize(DEFAULT_MAX_BYTES)} output limit.`;
 					text += ` Showing the first ${formatSize(firstLinePreview.bytes)} of ${formatSize(truncation.totalBytes)}.`;
 					text += ` Full output saved to: ${outputPath}]`;

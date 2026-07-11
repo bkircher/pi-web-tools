@@ -6,7 +6,8 @@
 		"lib": ["ES2024", "DOM"],
 		"strict": true,
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
 		"skipLibCheck": true
 	},
-	"include": ["extensions/**/*.ts"]
+	"include": ["extensions/**/*.ts", "tests/**/*.ts"]
 }

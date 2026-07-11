@@ -73,8 +73,8 @@ Output limits:
   lines or 50.0KB, whichever comes first.
 - If output is truncated, the full Obscura output is left in a per-user
   temporary file and the path is included in the tool result.
-- If the Obscura output is larger than 10 MiB, the tool reads only a small
-  preview and keeps the full output file.
+- Obscura output is scanned from disk with constant memory; only the bounded
+  preview returned to the model is retained in memory.
 
 Usage guidance:
 

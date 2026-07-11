@@ -1,12 +1,8 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { decode } from "html-entities";
 import { Type } from "typebox";
+import { parseDuckDuckGoHtml, type SearchResult } from "./duckduckgo.js";
 
-export type SearchResult = {
-	title: string;
-	url: string;
-	snippet?: string;
-};
+export type { SearchResult } from "./duckduckgo.js";
 
 type CacheEntry = {
 	expiresAt: number;
@@ -82,84 +78,6 @@ function setCached(query: string, results: SearchResult[]): void {
 function makeSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
 	const timeoutSignal = AbortSignal.timeout(timeoutMs);
 	return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-}
-
-function decodeHtmlEntities(value: string, scope: "body" | "attribute" = "body"): string {
-	return decode(value, { level: "html5", scope });
-}
-
-function textFromHtml(html: string): string {
-	return decodeHtmlEntities(
-		html
-			.replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-			.replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-			.replace(/<[^>]*>/g, " "),
-	)
-		.replace(/\s+/g, " ")
-		.trim();
-}
-
-function getAttribute(tag: string, name: string): string | undefined {
-	const pattern = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
-	const match = tag.match(pattern);
-	const raw = match?.[1] ?? match?.[2] ?? match?.[3];
-	return raw ? decodeHtmlEntities(raw, "attribute") : undefined;
-}
-
-function unwrapDuckDuckGoUrl(href: string): string | undefined {
-	let url: URL;
-	try {
-		url = new URL(href, "https://html.duckduckgo.com");
-	} catch {
-		return undefined;
-	}
-
-	const isDuckDuckGoRedirect =
-		(url.hostname === "duckduckgo.com" || url.hostname.endsWith(".duckduckgo.com")) && url.pathname === "/l/";
-	const uddg = isDuckDuckGoRedirect ? url.searchParams.get("uddg") : undefined;
-	if (uddg) {
-		try {
-			url = new URL(uddg);
-		} catch {
-			return undefined;
-		}
-	}
-
-	if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-	return url.href;
-}
-
-function parseDuckDuckGoHtml(html: string): SearchResult[] {
-	const results: SearchResult[] = [];
-	const seen = new Set<string>();
-	const linkPattern =
-		/<a\b([^>]*\bclass\s*=\s*(?:"[^"]*\bresult__a\b[^"]*"|'[^']*\bresult__a\b[^']*'|[^\s>]*\bresult__a\b[^\s>]*)[^>]*)>([\s\S]*?)<\/a>/gi;
-
-	for (const match of html.matchAll(linkPattern)) {
-		const fullMatch = match[0];
-		const attrs = match[1] ?? "";
-		const body = match[2] ?? "";
-		const href = getAttribute(`<a ${attrs}>`, "href");
-		const url = href ? unwrapDuckDuckGoUrl(href) : undefined;
-		const title = textFromHtml(body);
-
-		if (!title || !url || seen.has(url)) continue;
-
-		const afterLink = html.slice((match.index ?? 0) + fullMatch.length, (match.index ?? 0) + fullMatch.length + 4000);
-		const snippetMatch = afterLink.match(
-			/<(?:a|div)\b[^>]*\bclass\s*=\s*(?:"[^"]*\bresult__snippet\b[^"]*"|'[^']*\bresult__snippet\b[^']*'|[^\s>]*\bresult__snippet\b[^\s>]*)[^>]*>([\s\S]*?)<\/(?:a|div)>/i,
-		);
-		const snippet = snippetMatch?.[1] ? textFromHtml(snippetMatch[1]) : undefined;
-
-		seen.add(url);
-		results.push({
-			title,
-			url,
-			...(snippet ? { snippet } : {}),
-		});
-	}
-
-	return results;
 }
 
 function formatResults(results: SearchResult[]): string {
@@ -280,7 +198,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 
 			const startedAt = Date.now();
 			const cached = getCached(query);
-			const allResults = cached ?? parseDuckDuckGoHtml(await fetchDuckDuckGoHtml(query, signal));
+			const allResults = cached ?? parseDuckDuckGoHtml(await fetchDuckDuckGoHtml(query, signal), MAX_LIMIT);
 			if (!cached) setCached(query, allResults);
 
 			if (allResults.length === 0) {

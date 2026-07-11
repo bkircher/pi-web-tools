@@ -35,6 +35,6 @@
 	"author": "bkircher@0xadd.de",
 	"license": "MIT",
 	"dependencies": {
-		"html-entities": "^2.6.0"
+		"parse5": "^8.0.1"
 	}
 }

@@ -334,7 +334,7 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 }
 
 function createWebFetchTempDir(): Promise<string> {
-	return mkdtemp(join(process.env.TMPDIR ?? tmpdir(), "pi-web-fetch-"));
+	return mkdtemp(join(tmpdir(), "pi-web-fetch-"));
 }
 
 async function readObscuraOutput(outputPath: string): Promise<{ text: string; bytes: number; tooLarge: boolean }> {

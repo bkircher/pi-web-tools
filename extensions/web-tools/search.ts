@@ -114,7 +114,9 @@ function unwrapDuckDuckGoUrl(href: string): string | undefined {
 		return undefined;
 	}
 
-	const uddg = url.searchParams.get("uddg");
+	const isDuckDuckGoRedirect =
+		(url.hostname === "duckduckgo.com" || url.hostname.endsWith(".duckduckgo.com")) && url.pathname === "/l/";
+	const uddg = isDuckDuckGoRedirect ? url.searchParams.get("uddg") : undefined;
 	if (uddg) {
 		try {
 			url = new URL(uddg);

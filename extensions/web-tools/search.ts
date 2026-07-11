@@ -47,11 +47,6 @@ const webSearchParams = Type.Object({
 	),
 });
 
-function clampLimit(limit: number | undefined): number {
-	if (!Number.isFinite(limit ?? 10)) return 10;
-	return Math.max(1, Math.min(MAX_LIMIT, Math.trunc(limit ?? 10)));
-}
-
 function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -278,11 +273,8 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 
 		async execute(_toolCallId, params, signal): Promise<AgentToolResult<WebSearchDetails>> {
 			const query = params.query.trim();
-			const limit = clampLimit(params.limit);
+			const limit = params.limit ?? 10;
 			if (!query) throw new Error("Search query must not be empty");
-			if (query.length > MAX_QUERY_LENGTH) {
-				throw new Error(`Search query is longer than ${MAX_QUERY_LENGTH} characters`);
-			}
 
 			const startedAt = Date.now();
 			const cached = getCached(query);

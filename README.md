@@ -6,6 +6,11 @@ A pi extension that adds the `web_search` DuckDuckGo tool and the `web_fetch`
 
 ## Tools
 
+In pi's interactive TUI, both tools show the request URL and a compact result
+summary by default. Press Ctrl+O to expand the full search results or fetched
+content. This changes only the display; the complete tool content is still
+returned to the model.
+
 ### `web_search`
 
 Queries DuckDuckGo's non-JavaScript HTML endpoint and returns result titles,
@@ -16,7 +21,8 @@ Parameters:
 - `query`: search query, 1-500 characters.
 - `limit`: optional number of results to return, 1-20. Defaults to 10.
 
-Use `web_search` for discovery.
+Use `web_search` for discovery. Its compact summary includes the DuckDuckGo HTTP
+status, response HTML size, result count, elapsed time, and cache status.
 
 ### `web_fetch`
 
@@ -43,6 +49,9 @@ Behavior:
 - Always passes `--stealth` to Obscura.
 - Always passes `--wait` to Obscura. The default post-navigation wait is 5
   seconds; set `wait` to 0 to disable it.
+- Its compact summary includes the output mode, dumped-output size, elapsed
+  time, and truncation status. Obscura's current CLI output does not expose the
+  page's HTTP status.
 
 Parameters:
 

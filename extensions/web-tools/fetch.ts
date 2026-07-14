@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { scanOutput, type ScannedOutput } from "./output.js";
+import { renderWebFetchCall, renderWebFetchResult } from "./render.js";
 
 const WEB_FETCH_DUMP_MODES = ["markdown", "text", "html", "links", "assets"] as const;
 const WEB_FETCH_WAIT_UNTIL_VALUES = ["load", "domcontentloaded", "networkidle0", "networkidle2"] as const;
@@ -491,5 +492,8 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 				}
 			}
 		},
+
+		renderCall: renderWebFetchCall,
+		renderResult: renderWebFetchResult,
 	});
 }

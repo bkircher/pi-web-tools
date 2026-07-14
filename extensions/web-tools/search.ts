@@ -1,25 +1,36 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { parseDuckDuckGoHtml, type SearchResult } from "./duckduckgo.js";
+import {
+	buildDuckDuckGoSearchUrl,
+	DUCKDUCKGO_SEARCH_URL,
+	renderWebSearchCall,
+	renderWebSearchResult,
+} from "./render.js";
 
 export type { SearchResult } from "./duckduckgo.js";
 
-type CacheEntry = {
-	expiresAt: number;
+type SearchResponse = {
+	searchUrl: string;
+	status: number;
+	bytes: number;
 	results: SearchResult[];
 };
 
-export type WebSearchDetails = {
+type CacheEntry = {
+	expiresAt: number;
+	response: SearchResponse;
+};
+
+export type WebSearchDetails = SearchResponse & {
 	query: string;
 	limit: number;
 	cached: boolean;
 	elapsedMs: number;
 	resultCount: number;
-	results: SearchResult[];
 };
 
-const SEARCH_URL = "https://html.duckduckgo.com/html/";
-const SEARCH_HOSTNAME = new URL(SEARCH_URL).hostname;
+const SEARCH_HOSTNAME = new URL(DUCKDUCKGO_SEARCH_URL).hostname;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
@@ -47,7 +58,7 @@ function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function getCached(query: string): SearchResult[] | undefined {
+function getCached(query: string): SearchResponse | undefined {
 	const key = cacheKey(query);
 	const entry = cache.get(key);
 	if (!entry) return undefined;
@@ -59,13 +70,13 @@ function getCached(query: string): SearchResult[] | undefined {
 	// Refresh insertion order for simple LRU behavior.
 	cache.delete(key);
 	cache.set(key, entry);
-	return entry.results;
+	return entry.response;
 }
 
-function setCached(query: string, results: SearchResult[]): void {
+function setCached(query: string, response: SearchResponse): void {
 	cache.set(cacheKey(query), {
 		expiresAt: Date.now() + CACHE_TTL_MS,
-		results,
+		response,
 	});
 
 	while (cache.size > MAX_CACHE_ENTRIES) {
@@ -94,7 +105,7 @@ function throwDuckDuckGoHtmlTooLarge(): never {
 	throw new Error(`DuckDuckGo returned more than ${MAX_HTML_BYTES} bytes of HTML`);
 }
 
-async function readDuckDuckGoHtml(response: Response): Promise<string> {
+async function readDuckDuckGoHtml(response: Response): Promise<{ html: string; bytes: number }> {
 	const contentLength = response.headers.get("content-length");
 	if (contentLength) {
 		const contentLengthBytes = Number(contentLength);
@@ -103,7 +114,7 @@ async function readDuckDuckGoHtml(response: Response): Promise<string> {
 		}
 	}
 
-	if (!response.body) return "";
+	if (!response.body) return { html: "", bytes: 0 };
 
 	const reader = response.body.getReader();
 	const decoder = new TextDecoder();
@@ -128,7 +139,7 @@ async function readDuckDuckGoHtml(response: Response): Promise<string> {
 	}
 
 	html += decoder.decode();
-	return html;
+	return { html, bytes };
 }
 
 function isRedirectStatus(status: number): boolean {
@@ -143,11 +154,8 @@ function getRedirectHostname(location: string, baseUrl: URL): string | undefined
 	}
 }
 
-async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefined): Promise<string> {
-	const url = new URL(SEARCH_URL);
-	url.searchParams.set("q", query);
-	url.searchParams.set("kl", "wt-wt");
-	url.searchParams.set("kp", "-1");
+async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefined): Promise<SearchResponse> {
+	const url = buildDuckDuckGoSearchUrl(query);
 
 	const response = await fetch(url, {
 		headers: {
@@ -172,7 +180,13 @@ async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefine
 		throw new Error(`DuckDuckGo search failed: HTTP ${response.status}`);
 	}
 
-	return readDuckDuckGoHtml(response);
+	const { html, bytes } = await readDuckDuckGoHtml(response);
+	return {
+		searchUrl: url.href,
+		status: response.status,
+		bytes,
+		results: parseDuckDuckGoHtml(html, MAX_LIMIT),
+	};
 }
 
 /**
@@ -197,11 +211,22 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();
-			const cached = getCached(query);
-			const allResults = cached ?? parseDuckDuckGoHtml(await fetchDuckDuckGoHtml(query, signal), MAX_LIMIT);
-			if (!cached) setCached(query, allResults);
+			const cachedResponse = getCached(query);
+			const response = cachedResponse ?? (await fetchDuckDuckGoHtml(query, signal));
+			if (!cachedResponse) setCached(query, response);
 
-			if (allResults.length === 0) {
+			const results = response.results.slice(0, limit);
+			const details: WebSearchDetails = {
+				...response,
+				query,
+				limit,
+				cached: Boolean(cachedResponse),
+				elapsedMs: Date.now() - startedAt,
+				resultCount: results.length,
+				results,
+			};
+
+			if (results.length === 0) {
 				return {
 					content: [
 						{
@@ -209,29 +234,17 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 							text: "No search results found. The DuckDuckGo HTML format may also have changed.",
 						},
 					],
-					details: {
-						query,
-						limit,
-						cached: Boolean(cached),
-						elapsedMs: Date.now() - startedAt,
-						resultCount: 0,
-						results: [],
-					},
+					details,
 				};
 			}
 
-			const results = allResults.slice(0, limit);
 			return {
 				content: [{ type: "text", text: formatResults(results) }],
-				details: {
-					query,
-					limit,
-					cached: Boolean(cached),
-					elapsedMs: Date.now() - startedAt,
-					resultCount: results.length,
-					results,
-				},
+				details,
 			};
 		},
+
+		renderCall: renderWebSearchCall,
+		renderResult: renderWebSearchResult,
 	});
 }

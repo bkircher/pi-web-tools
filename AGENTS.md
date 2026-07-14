@@ -1,6 +1,6 @@
 # AGENTS.md
 
-- This repository is a pi extension.
+- This repository is a Pi extension.
 - The pi source code lives under `~/src/pi`; the Obscura source code lives under
   `~/src/obscura`. Feel free to consult them if needed.
 - Before running any `npm` command, run `source ~/.nvm/nvm.sh && nvm use` to

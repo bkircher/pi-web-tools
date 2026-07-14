@@ -10,14 +10,15 @@ export type WebToolRenderContext = {
 	isError: boolean;
 };
 
-type SearchRenderDetails = {
+type SearchRenderMetadata = {
 	status?: number;
 	bytes?: number;
-	results?: unknown[];
-	resultCount?: number;
 	cached: boolean;
 	elapsedMs: number;
 };
+
+type SearchRenderDetails = SearchRenderMetadata &
+	({ results: unknown[]; resultCount?: number } | { results?: undefined; resultCount: number });
 
 type FetchRenderDetails = {
 	mode: "dump" | "eval";
@@ -85,7 +86,7 @@ export function renderWebSearchResult(
 		return new Text(theme.fg("error", output || "Search failed"), 0, 0);
 	}
 
-	const count = details.resultCount ?? details.results?.length;
+	const count = details.results?.length ?? details.resultCount;
 	if (count === undefined) {
 		return new Text(theme.fg("error", output || "Search result details unavailable"), 0, 0);
 	}

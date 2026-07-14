@@ -47,7 +47,26 @@ test("web_search keeps result content hidden in the collapsed summary", () => {
 	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 2 results · 123B HTML · 42ms"]);
 });
 
-test("web_search renders summaries from sessions without HTTP metadata", () => {
+test("web_search derives the count from results when a persisted count differs", () => {
+	const result = {
+		content: [{ type: "text" as const, text: "Search output" }],
+		details: {
+			results: [
+				{ title: "pnpm", url: "https://pnpm.io/" },
+				{ title: "Docs", url: "https://pnpm.io/motivation" },
+			],
+			resultCount: 99,
+			cached: false,
+			elapsedMs: 42,
+		},
+	};
+
+	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
+
+	assert.deepEqual(renderLines(component), ["✓ · 2 results · 42ms"]);
+});
+
+test("web_search renders summaries from legacy details without results", () => {
 	const result = {
 		content: [{ type: "text" as const, text: "1. pnpm\n   https://pnpm.io/" }],
 		details: {

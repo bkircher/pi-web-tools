@@ -27,7 +27,6 @@ export type WebSearchDetails = SearchResponse & {
 	limit: number;
 	cached: boolean;
 	elapsedMs: number;
-	resultCount: number;
 };
 
 const SEARCH_HOSTNAME = new URL(DUCKDUCKGO_SEARCH_URL).hostname;
@@ -222,7 +221,6 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 				limit,
 				cached: Boolean(cachedResponse),
 				elapsedMs: Date.now() - startedAt,
-				resultCount: results.length,
 				results,
 			};
 

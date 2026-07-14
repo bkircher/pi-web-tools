@@ -1,8 +1,8 @@
 import { formatSize, type AgentToolResult } from "@earendil-works/pi-coding-agent";
-import type { WebFetchBaseDetails, WebFetchDetails } from "./fetch-types.js";
-import type { ObscuraExecution, ObscuraRequest } from "./obscura.js";
+import type { Details } from "./fetch-types.js";
+import type { Execution, Request } from "./obscura.js";
 
-function makeUtf8PrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
+function makePrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
 	let bytes = 0;
 	let endIndex = 0;
 
@@ -19,14 +19,14 @@ function makeUtf8PrefixPreview(content: string, maxBytes: number): { content: st
 	};
 }
 
-function formatOutput(execution: ObscuraExecution): string {
+function formatOutput(execution: Execution): string {
 	const { output } = execution;
-	const { truncation } = output.output;
+	const { truncation } = output.scan;
 	let text = truncation.content;
 
 	if (output.retention === "retain") {
 		const firstLinePreview = truncation.firstLineExceedsLimit
-			? makeUtf8PrefixPreview(output.output.text, truncation.maxBytes)
+			? makePrefixPreview(output.scan.text, truncation.maxBytes)
 			: undefined;
 		text = firstLinePreview?.content ?? text;
 
@@ -45,33 +45,29 @@ function formatOutput(execution: ObscuraExecution): string {
 	return text;
 }
 
-export function createWebFetchResult(
-	request: ObscuraRequest,
-	execution: ObscuraExecution,
-	elapsedMs: number,
-): AgentToolResult<WebFetchDetails> {
+export function createResult(request: Request, execution: Execution, elapsedMs: number): AgentToolResult<Details> {
 	const { output } = execution;
 	const outputDetails =
 		output.retention === "retain"
 			? {
 					truncated: true as const,
-					truncation: output.output.truncation,
+					truncation: output.scan.truncation,
 					fullOutputPath: output.fullOutputPath,
 				}
 			: { truncated: false as const };
-	const commonDetails: WebFetchBaseDetails = {
+	const commonDetails = {
 		url: request.url,
 		waitUntil: request.waitUntil,
 		wait: request.wait,
 		timeout: request.timeout,
-		stealth: true,
+		stealth: true as const,
 		proxy: Boolean(request.proxy),
 		elapsedMs,
-		bytes: output.output.bytes,
+		bytes: output.scan.bytes,
 		...outputDetails,
 		...(execution.stderr ? { stderr: execution.stderr } : {}),
 	};
-	const details: WebFetchDetails =
+	const details: Details =
 		request.mode === "eval"
 			? { ...commonDetails, mode: "eval", eval: request.script }
 			: {

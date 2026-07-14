@@ -1,35 +1,15 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { parseDuckDuckGoHtml, type SearchResult } from "./duckduckgo.js";
-import {
-	buildDuckDuckGoSearchUrl,
-	DUCKDUCKGO_SEARCH_URL,
-	renderWebSearchCall,
-	renderWebSearchResult,
-} from "./render.js";
-
-export type { SearchResult } from "./duckduckgo.js";
-
-type SearchResponse = {
-	searchUrl: string;
-	status: number;
-	bytes: number;
-	results: SearchResult[];
-};
+import { parseHtml, type Result } from "./duckduckgo.js";
+import { buildSearchUrl, renderSearchCall, renderSearchResult, SEARCH_URL } from "./render.js";
+import type { Details, ResponseData } from "./search-types.js";
 
 type CacheEntry = {
 	expiresAt: number;
-	response: SearchResponse;
+	response: ResponseData;
 };
 
-export type WebSearchDetails = SearchResponse & {
-	query: string;
-	limit: number;
-	cached: boolean;
-	elapsedMs: number;
-};
-
-const SEARCH_HOSTNAME = new URL(DUCKDUCKGO_SEARCH_URL).hostname;
+const SEARCH_HOSTNAME = new URL(SEARCH_URL).hostname;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
@@ -38,7 +18,7 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024;
 
 const cache = new Map<string, CacheEntry>();
 
-const webSearchParams = Type.Object({
+const parameters = Type.Object({
 	query: Type.String({
 		description: "Search query to send to DuckDuckGo HTML search",
 		minLength: 1,
@@ -57,7 +37,7 @@ function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function getCached(query: string): SearchResponse | undefined {
+function getCached(query: string): ResponseData | undefined {
 	const key = cacheKey(query);
 	const entry = cache.get(key);
 	if (!entry) return undefined;
@@ -72,7 +52,7 @@ function getCached(query: string): SearchResponse | undefined {
 	return entry.response;
 }
 
-function setCached(query: string, response: SearchResponse): void {
+function setCached(query: string, response: ResponseData): void {
 	cache.set(cacheKey(query), {
 		expiresAt: Date.now() + CACHE_TTL_MS,
 		response,
@@ -90,7 +70,7 @@ function makeSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSi
 	return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 }
 
-function formatResults(results: SearchResult[]): string {
+function formatResults(results: Result[]): string {
 	return results
 		.map((result, index) => {
 			const lines = [`${index + 1}. ${result.title}`, `   ${result.url}`];
@@ -100,16 +80,16 @@ function formatResults(results: SearchResult[]): string {
 		.join("\n\n");
 }
 
-function throwDuckDuckGoHtmlTooLarge(): never {
+function throwHtmlTooLarge(): never {
 	throw new Error(`DuckDuckGo returned more than ${MAX_HTML_BYTES} bytes of HTML`);
 }
 
-async function readDuckDuckGoHtml(response: Response): Promise<{ html: string; bytes: number }> {
+async function readHtml(response: Response): Promise<{ html: string; bytes: number }> {
 	const contentLength = response.headers.get("content-length");
 	if (contentLength) {
 		const contentLengthBytes = Number(contentLength);
 		if (Number.isFinite(contentLengthBytes) && contentLengthBytes > MAX_HTML_BYTES) {
-			throwDuckDuckGoHtmlTooLarge();
+			throwHtmlTooLarge();
 		}
 	}
 
@@ -128,7 +108,7 @@ async function readDuckDuckGoHtml(response: Response): Promise<{ html: string; b
 			bytes += value.byteLength;
 			if (bytes > MAX_HTML_BYTES) {
 				await reader.cancel().catch(() => {});
-				throwDuckDuckGoHtmlTooLarge();
+				throwHtmlTooLarge();
 			}
 
 			html += decoder.decode(value, { stream: true });
@@ -153,8 +133,8 @@ function getRedirectHostname(location: string, baseUrl: URL): string | undefined
 	}
 }
 
-async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefined): Promise<SearchResponse> {
-	const url = buildDuckDuckGoSearchUrl(query);
+async function fetchHtml(query: string, signal: AbortSignal | undefined): Promise<ResponseData> {
+	const url = buildSearchUrl(query);
 
 	const response = await fetch(url, {
 		headers: {
@@ -179,19 +159,19 @@ async function fetchDuckDuckGoHtml(query: string, signal: AbortSignal | undefine
 		throw new Error(`DuckDuckGo search failed: HTTP ${response.status}`);
 	}
 
-	const { html, bytes } = await readDuckDuckGoHtml(response);
+	const { html, bytes } = await readHtml(response);
 	return {
 		searchUrl: url.href,
 		status: response.status,
 		bytes,
-		results: parseDuckDuckGoHtml(html, MAX_LIMIT),
+		results: parseHtml(html, MAX_LIMIT),
 	};
 }
 
 /**
  * Register the `web_search` tool, which searches DuckDuckGo's non-JavaScript HTML endpoint.
  */
-export function registerWebSearchTool(pi: ExtensionAPI): void {
+export function registerTool(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "web_search",
 		label: "Web Search",
@@ -202,20 +182,20 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 			"Use web_search when the user asks for current or external web information that is not available in the repository.",
 			"When using web_search results in an answer, cite the relevant result URLs.",
 		],
-		parameters: webSearchParams,
+		parameters,
 
-		async execute(_toolCallId, params, signal): Promise<AgentToolResult<WebSearchDetails>> {
+		async execute(_toolCallId, params, signal): Promise<AgentToolResult<Details>> {
 			const query = params.query.trim();
 			const limit = params.limit ?? 10;
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();
 			const cachedResponse = getCached(query);
-			const response = cachedResponse ?? (await fetchDuckDuckGoHtml(query, signal));
+			const response = cachedResponse ?? (await fetchHtml(query, signal));
 			if (!cachedResponse) setCached(query, response);
 
 			const results = response.results.slice(0, limit);
-			const details: WebSearchDetails = {
+			const details: Details = {
 				...response,
 				query,
 				limit,
@@ -242,7 +222,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 			};
 		},
 
-		renderCall: renderWebSearchCall,
-		renderResult: renderWebSearchResult,
+		renderCall: renderSearchCall,
+		renderResult: renderSearchResult,
 	});
 }

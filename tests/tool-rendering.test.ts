@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, Theme } from "@earendil-works/pi-coding-agent";
+import type { Details as WebFetchDetails } from "../extensions/web-tools/fetch-types.ts";
 import {
-	renderWebFetchCall,
-	renderWebFetchResult,
-	renderWebSearchCall,
-	renderWebSearchResult,
+	renderFetchCall as renderWebFetchCall,
+	renderFetchResult as renderWebFetchResult,
+	renderSearchCall as renderWebSearchCall,
+	renderSearchResult as renderWebSearchResult,
 } from "../extensions/web-tools/render.ts";
+import type { Details as SearchDetails } from "../extensions/web-tools/search-types.ts";
 
 const theme = {
 	fg: (_color: string, text: string) => text,
@@ -28,15 +30,18 @@ test("web_search renders the exact DuckDuckGo request URL", () => {
 });
 
 test("web_search keeps result content hidden in the collapsed summary", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "1. pnpm\n   https://pnpm.io/" }],
+	const result: AgentToolResult<SearchDetails> = {
+		content: [{ type: "text", text: "1. pnpm\n   https://pnpm.io/" }],
 		details: {
+			searchUrl: "https://html.duckduckgo.com/html/?q=pnpm",
 			status: 200,
 			bytes: 123,
 			results: [
 				{ title: "pnpm", url: "https://pnpm.io/" },
 				{ title: "Docs", url: "https://pnpm.io/motivation" },
 			],
+			query: "pnpm",
+			limit: 10,
 			cached: false,
 			elapsedMs: 42,
 		},
@@ -47,47 +52,16 @@ test("web_search keeps result content hidden in the collapsed summary", () => {
 	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 2 results · 123B HTML · 42ms"]);
 });
 
-test("web_search derives the count from results when a persisted count differs", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "Search output" }],
-		details: {
-			results: [
-				{ title: "pnpm", url: "https://pnpm.io/" },
-				{ title: "Docs", url: "https://pnpm.io/motivation" },
-			],
-			resultCount: 99,
-			cached: false,
-			elapsedMs: 42,
-		},
-	};
-
-	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
-
-	assert.deepEqual(renderLines(component), ["✓ · 2 results · 42ms"]);
-});
-
-test("web_search renders summaries from legacy details without results", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "1. pnpm\n   https://pnpm.io/" }],
-		details: {
-			resultCount: 2,
-			cached: false,
-			elapsedMs: 42,
-		},
-	};
-
-	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
-
-	assert.deepEqual(renderLines(component), ["✓ · 2 results · 42ms"]);
-});
-
 test("web_search displays result content when expanded", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "1. pnpm\n   https://pnpm.io/" }],
+	const result: AgentToolResult<SearchDetails> = {
+		content: [{ type: "text", text: "1. pnpm\n   https://pnpm.io/" }],
 		details: {
+			searchUrl: "https://html.duckduckgo.com/html/?q=pnpm",
 			status: 200,
 			bytes: 123,
 			results: [{ title: "pnpm", url: "https://pnpm.io/" }],
+			query: "pnpm",
+			limit: 10,
 			cached: true,
 			elapsedMs: 3,
 		},
@@ -127,10 +101,16 @@ test("web_fetch escapes terminal control characters in invalid URLs", () => {
 });
 
 test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "# Example\n\nFetched page content" }],
+	const result: AgentToolResult<WebFetchDetails> = {
+		content: [{ type: "text", text: "# Example\n\nFetched page content" }],
 		details: {
-			mode: "dump" as const,
+			url: "https://example.com/",
+			waitUntil: "load",
+			wait: 5,
+			timeout: 30,
+			stealth: true,
+			proxy: false,
+			mode: "dump",
 			dump: "markdown",
 			bytes: 2048,
 			elapsedMs: 750,
@@ -144,10 +124,16 @@ test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
 });
 
 test("web_fetch displays fetched content when expanded", () => {
-	const result = {
-		content: [{ type: "text" as const, text: "# Example\n\nFetched page content" }],
+	const result: AgentToolResult<WebFetchDetails> = {
+		content: [{ type: "text", text: "# Example\n\nFetched page content" }],
 		details: {
-			mode: "dump" as const,
+			url: "https://example.com/",
+			waitUntil: "load",
+			wait: 5,
+			timeout: 30,
+			stealth: true,
+			proxy: false,
+			mode: "dump",
 			dump: "markdown",
 			bytes: 2048,
 			elapsedMs: 750,

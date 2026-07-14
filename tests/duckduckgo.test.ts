@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDuckDuckGoHtml } from "../extensions/web-tools/duckduckgo.ts";
+import { parseHtml as parseDuckDuckGoHtml } from "../extensions/web-tools/duckduckgo.ts";
 
 test("extracts decoded titles, snippets, and DuckDuckGo redirect URLs", () => {
 	const html = `

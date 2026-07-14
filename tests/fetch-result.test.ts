@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWebFetchResult } from "../extensions/web-tools/fetch-result.ts";
-import type { ObscuraRequest } from "../extensions/web-tools/obscura.ts";
-import { scanOutput } from "../extensions/web-tools/output.ts";
+import { createResult as createWebFetchResult } from "../extensions/web-tools/fetch-result.ts";
+import type { Request as ObscuraRequest } from "../extensions/web-tools/obscura.ts";
+import { scan as scanOutput } from "../extensions/web-tools/output.ts";
 
 const request: ObscuraRequest = {
 	mode: "dump",
@@ -17,7 +17,7 @@ const request: ObscuraRequest = {
 test("formats complete Obscura output without retention details", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
 	const execution = {
-		output: { retention: "discard" as const, output },
+		output: { retention: "discard" as const, scan: output },
 		stderr: "browser warning",
 	};
 
@@ -46,7 +46,7 @@ test("formats truncated output with its retained file path", async () => {
 	const execution = {
 		output: {
 			retention: "retain" as const,
-			output,
+			scan: output,
 			fullOutputPath: "/retained/output.txt",
 		},
 	};
@@ -68,7 +68,7 @@ test("returns a UTF-8 prefix when the first line exceeds the byte limit", async 
 	const execution = {
 		output: {
 			retention: "retain" as const,
-			output,
+			scan: output,
 			fullOutputPath: "/retained/output.txt",
 		},
 	};

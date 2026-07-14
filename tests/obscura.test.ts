@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-	buildObscuraArgs,
-	executeObscuraFetch,
-	type ObscuraOutputSource,
-	type ObscuraRequest,
-	type ObscuraStorage,
+	buildArgs as buildObscuraArgs,
+	execute as executeObscuraFetch,
+	type OutputSource as ObscuraOutputSource,
+	type Request as ObscuraRequest,
+	type Storage as ObscuraStorage,
 } from "../extensions/web-tools/obscura.ts";
 
 const dumpRequest: ObscuraRequest = {
@@ -98,7 +98,7 @@ test("persists truncated stdout fallback output before deleting the working dire
 	const result = await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
 	assert.ok(result.output.retention === "retain");
-	assert.equal(result.output.output.bytes, 51_201);
+	assert.equal(result.output.scan.bytes, 51_201);
 	assert.equal(result.output.fullOutputPath, "/retained/output.txt");
 	assert.equal(retainedSource, "stdout");
 	assert.equal(removedWorkingDirectory, "/work");

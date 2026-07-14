@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scanOutput } from "../extensions/web-tools/output.ts";
+import { scan as scanOutput } from "../extensions/web-tools/output.ts";
 
 test("returns empty output metadata", async () => {
 	const chunks: Uint8Array[] = [];

@@ -7,13 +7,13 @@ import {
 
 const MAX_UTF8_CODE_POINT_BYTES = 4;
 
-export type ScannedOutput = {
+export type ScanResult = {
 	text: string;
 	bytes: number;
 	truncation: TruncationResult;
 };
 
-export type OutputLimits = {
+type Limits = {
 	maxBytes?: number;
 	maxLines?: number;
 };
@@ -21,10 +21,10 @@ export type OutputLimits = {
 /**
  * Scans output using constant memory while retaining only enough data to produce a bounded preview.
  */
-export async function scanOutput(
+export async function scan(
 	chunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
-	limits: OutputLimits = {},
-): Promise<ScannedOutput> {
+	limits: Limits = {},
+): Promise<ScanResult> {
 	const maxBytes = limits.maxBytes ?? DEFAULT_MAX_BYTES;
 	const maxLines = limits.maxLines ?? DEFAULT_MAX_LINES;
 	const retainedByteLimit = maxBytes + MAX_UTF8_CODE_POINT_BYTES;

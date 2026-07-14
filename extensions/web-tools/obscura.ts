@@ -3,55 +3,55 @@ import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecOptions, ExecResult } from "@earendil-works/pi-coding-agent";
-import type { WebFetchDumpMode, WebFetchWaitUntil } from "./fetch-types.js";
-import { scanOutput, type ScannedOutput } from "./output.ts";
+import type { DumpMode, WaitUntil } from "./fetch-types.js";
+import { scan, type ScanResult } from "./output.ts";
 
-type ObscuraRequestBase = {
+type RequestBase = {
 	url: string;
-	waitUntil: WebFetchWaitUntil;
+	waitUntil: WaitUntil;
 	wait: number;
 	timeout: number;
 	proxy?: string;
 };
 
-export type ObscuraRequest = ObscuraRequestBase &
-	({ mode: "dump"; dump: WebFetchDumpMode; selector?: string } | { mode: "eval"; script: string });
+export type Request = RequestBase &
+	({ mode: "dump"; dump: DumpMode; selector?: string } | { mode: "eval"; script: string });
 
-export type ObscuraOutputSource =
-	| { source: "file"; path: string; output: ScannedOutput }
-	| { source: "stdout"; content: string; output: ScannedOutput };
+export type OutputSource =
+	| { source: "file"; path: string; scan: ScanResult }
+	| { source: "stdout"; content: string; scan: ScanResult };
 
-export type PreparedObscuraOutput =
-	| { retention: "discard"; output: ScannedOutput }
-	| { retention: "retain"; output: ScannedOutput; fullOutputPath: string };
+type PreparedOutput =
+	| { retention: "discard"; scan: ScanResult }
+	| { retention: "retain"; scan: ScanResult; fullOutputPath: string };
 
-export type ObscuraExecution = {
-	output: PreparedObscuraOutput;
+export type Execution = {
+	output: PreparedOutput;
 	stderr?: string;
 };
 
-export type ObscuraExec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
+type Exec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
 
-export type ObscuraStorage = {
+export type Storage = {
 	createWorkingDirectory(): Promise<string>;
-	readOutputFile(path: string): Promise<ScannedOutput>;
-	retainOutput(source: ObscuraOutputSource): Promise<string>;
+	readOutputFile(path: string): Promise<ScanResult>;
+	retainOutput(source: OutputSource): Promise<string>;
 	removeWorkingDirectory(path: string): Promise<void>;
 };
 
-export type ExecuteObscuraOptions = {
-	exec: ObscuraExec;
+type ExecuteOptions = {
+	exec: Exec;
 	cwd: string;
 	signal?: AbortSignal;
-	storage?: ObscuraStorage;
+	storage?: Storage;
 };
 
-function createWebFetchTempDir(prefix: string): Promise<string> {
+function createTempDir(prefix: string): Promise<string> {
 	return mkdtemp(join(tmpdir(), prefix));
 }
 
-async function retainOutput(source: ObscuraOutputSource): Promise<string> {
-	const retainedDirectory = await createWebFetchTempDir("pi-web-fetch-output-");
+async function retainOutput(source: OutputSource): Promise<string> {
+	const retainedDirectory = await createTempDir("pi-web-fetch-output-");
 	const retainedPath = join(retainedDirectory, "output.txt");
 
 	try {
@@ -67,14 +67,14 @@ async function retainOutput(source: ObscuraOutputSource): Promise<string> {
 	}
 }
 
-const nodeObscuraStorage: ObscuraStorage = {
-	createWorkingDirectory: () => createWebFetchTempDir("pi-web-fetch-"),
-	readOutputFile: (path) => scanOutput(createReadStream(path)),
+const nodeStorage: Storage = {
+	createWorkingDirectory: () => createTempDir("pi-web-fetch-"),
+	readOutputFile: (path) => scan(createReadStream(path)),
 	retainOutput,
 	removeWorkingDirectory: (path) => rm(path, { recursive: true, force: true }),
 };
 
-export function buildObscuraArgs(request: ObscuraRequest, outputPath: string): string[] {
+export function buildArgs(request: Request, outputPath: string): string[] {
 	const args = ["fetch", "--quiet", "--stealth"];
 	if (request.mode === "eval") {
 		args.push("--eval", request.script);
@@ -90,39 +90,33 @@ export function buildObscuraArgs(request: ObscuraRequest, outputPath: string): s
 	return args;
 }
 
-async function getObscuraOutputSource(
-	storage: ObscuraStorage,
-	outputPath: string,
-	stdout: string,
-): Promise<ObscuraOutputSource> {
+async function getOutputSource(storage: Storage, outputPath: string, stdout: string): Promise<OutputSource> {
 	try {
-		return { source: "file", path: outputPath, output: await storage.readOutputFile(outputPath) };
+		return { source: "file", path: outputPath, scan: await storage.readOutputFile(outputPath) };
 	} catch {
 		if (!stdout) throw new Error(`obscura fetch produced no readable output at ${outputPath}`);
 		return {
 			source: "stdout",
 			content: stdout,
-			output: await scanOutput([Buffer.from(stdout)]),
+			scan: await scan([Buffer.from(stdout)]),
 		};
 	}
 }
 
-export async function prepareObscuraOutput(
-	source: ObscuraOutputSource,
-	retain: (source: ObscuraOutputSource) => Promise<string>,
-): Promise<PreparedObscuraOutput> {
-	if (!source.output.truncation.truncated) {
-		return { retention: "discard", output: source.output };
-	}
+async function prepareOutput(
+	source: OutputSource,
+	retain: (source: OutputSource) => Promise<string>,
+): Promise<PreparedOutput> {
+	if (!source.scan.truncation.truncated) return { retention: "discard", scan: source.scan };
 
 	return {
 		retention: "retain",
-		output: source.output,
+		scan: source.scan,
 		fullOutputPath: await retain(source),
 	};
 }
 
-function assertObscuraSucceeded(result: ExecResult): void {
+function assertSucceeded(result: ExecResult): void {
 	if (result.killed) {
 		throw new Error("obscura fetch was cancelled or timed out");
 	}
@@ -133,25 +127,22 @@ function assertObscuraSucceeded(result: ExecResult): void {
 	}
 }
 
-export async function executeObscuraFetch(
-	request: ObscuraRequest,
-	options: ExecuteObscuraOptions,
-): Promise<ObscuraExecution> {
-	const storage = options.storage ?? nodeObscuraStorage;
+export async function execute(request: Request, options: ExecuteOptions): Promise<Execution> {
+	const storage = options.storage ?? nodeStorage;
 	const workingDirectory = await storage.createWorkingDirectory();
 	const outputPath = join(workingDirectory, "output.txt");
 
 	try {
 		const processTimeoutMs = (request.timeout + request.wait + 10) * 1000;
-		const result = await options.exec("obscura", buildObscuraArgs(request, outputPath), {
+		const result = await options.exec("obscura", buildArgs(request, outputPath), {
 			cwd: options.cwd,
 			signal: options.signal,
 			timeout: processTimeoutMs,
 		});
-		assertObscuraSucceeded(result);
+		assertSucceeded(result);
 
-		const source = await getObscuraOutputSource(storage, outputPath, result.stdout);
-		const output = await prepareObscuraOutput(source, storage.retainOutput);
+		const source = await getOutputSource(storage, outputPath, result.stdout);
+		const output = await prepareOutput(source, storage.retainOutput);
 		const stderr = result.stderr.trim();
 		return {
 			output,

@@ -1,6 +1,6 @@
 import { parse, type DefaultTreeAdapterTypes } from "parse5";
 
-export type SearchResult = {
+export type Result = {
 	title: string;
 	url: string;
 	snippet?: string;
@@ -58,7 +58,7 @@ function findFirstElement(root: ParentNode, predicate: (element: Element) => boo
 	return undefined;
 }
 
-function findClosestResultContainer(element: Element): Element | undefined {
+function findResultContainer(element: Element): Element | undefined {
 	let parent = element.parentNode;
 	while (parent) {
 		if (isElement(parent) && hasClass(parent, "result")) return parent;
@@ -77,7 +77,7 @@ function textContent(root: ParentNode): string {
 	return parts.join("").replace(/\s+/gu, " ").trim();
 }
 
-function unwrapDuckDuckGoUrl(href: string): string | undefined {
+function unwrapUrl(href: string): string | undefined {
 	let url: URL;
 	try {
 		url = new URL(href, "https://html.duckduckgo.com");
@@ -85,9 +85,9 @@ function unwrapDuckDuckGoUrl(href: string): string | undefined {
 		return undefined;
 	}
 
-	const isDuckDuckGoRedirect =
+	const isRedirect =
 		(url.hostname === "duckduckgo.com" || url.hostname.endsWith(".duckduckgo.com")) && url.pathname === "/l/";
-	const uddg = isDuckDuckGoRedirect ? url.searchParams.get("uddg") : undefined;
+	const uddg = isRedirect ? url.searchParams.get("uddg") : undefined;
 	if (uddg) {
 		try {
 			url = new URL(uddg);
@@ -100,21 +100,21 @@ function unwrapDuckDuckGoUrl(href: string): string | undefined {
 	return url.href;
 }
 
-export function parseDuckDuckGoHtml(html: string, maxResults: number): SearchResult[] {
+export function parseHtml(html: string, maxResults: number): Result[] {
 	if (maxResults <= 0) return [];
 
 	const document = parse(html);
-	const results: SearchResult[] = [];
+	const results: Result[] = [];
 	const seen = new Set<string>();
 
 	for (const link of walkElements(document)) {
 		if (link.tagName !== "a" || !hasClass(link, "result__a")) continue;
 		const href = getAttribute(link, "href");
-		const url = href ? unwrapDuckDuckGoUrl(href) : undefined;
+		const url = href ? unwrapUrl(href) : undefined;
 		const title = textContent(link);
 		if (!title || !url || seen.has(url)) continue;
 
-		const container = findClosestResultContainer(link);
+		const container = findResultContainer(link);
 		const snippetElement = container
 			? findFirstElement(container, (element) => hasClass(element, "result__snippet"))
 			: undefined;

@@ -3,9 +3,9 @@ import { BlockList, isIP } from "node:net";
 
 type IpVersion = "ipv4" | "ipv6";
 
-export type WebFetchHostResolver = (hostname: string) => Promise<ReadonlyArray<{ address: string }>>;
+export type Resolver = (hostname: string) => Promise<ReadonlyArray<{ address: string }>>;
 
-const BLOCKED_WEB_FETCH_IP_RANGES: Array<{ address: string; prefix: number; version: IpVersion }> = [
+const BLOCKED_IP_RANGES: Array<{ address: string; prefix: number; version: IpVersion }> = [
 	{ address: "0.0.0.0", prefix: 8, version: "ipv4" },
 	{ address: "10.0.0.0", prefix: 8, version: "ipv4" },
 	{ address: "100.64.0.0", prefix: 10, version: "ipv4" },
@@ -36,45 +36,45 @@ const BLOCKED_WEB_FETCH_IP_RANGES: Array<{ address: string; prefix: number; vers
 	{ address: "ff00::", prefix: 8, version: "ipv6" },
 ];
 
-const BLOCKED_WEB_FETCH_IPS = new BlockList();
-for (const { address, prefix, version } of BLOCKED_WEB_FETCH_IP_RANGES) {
-	BLOCKED_WEB_FETCH_IPS.addSubnet(address, prefix, version);
+const BLOCKED_IPS = new BlockList();
+for (const { address, prefix, version } of BLOCKED_IP_RANGES) {
+	BLOCKED_IPS.addSubnet(address, prefix, version);
 }
 
-const SPECIAL_USE_WEB_FETCH_HOSTNAMES = ["localhost", "local", "home.arpa", "internal"] as const;
+const SPECIAL_USE_HOSTNAMES = ["localhost", "local", "home.arpa", "internal"] as const;
 
-const SENSITIVE_URL_FIELD_NAME_PATTERN =
+const SENSITIVE_FIELD_PATTERN =
 	/(?:^|[^a-z0-9])(?:access[-_]?key|access[-_]?token|api[-_]?key|auth(?:orization)?|client[-_]?secret|credential|id[-_]?token|jwt|key|pass(?:word|wd)?|pwd|refresh[-_]?token|saml(?:response)?|secret|session(?:id)?|sid|sig(?:nature)?|token)(?:$|[^a-z0-9])/iu;
-const SENSITIVE_URL_VALUE_PATTERN =
+const SENSITIVE_VALUE_PATTERN =
 	/^(?:bearer\s+|(?:[a-z0-9_-]{10,}\.){2}[a-z0-9_-]{10,}|(?:gh[pousr]_|github_pat_|glpat-|sk-[a-z0-9]|xox[baprs]-|AKIA|ASIA|AIza)[a-z0-9_-]{8,})/iu;
 
-function unbracketHostname(hostname: string): string {
+function stripBrackets(hostname: string): string {
 	return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
 }
 
-function stripTrailingDots(hostname: string): string {
-	return hostname.replace(/\.+$/u, "");
+function normalizeHostname(hostname: string): string {
+	return stripBrackets(hostname).replace(/\.+$/u, "").toLowerCase();
 }
 
 function getIpVersion(address: string): IpVersion | undefined {
-	const version = isIP(unbracketHostname(address));
+	const version = isIP(stripBrackets(address));
 	if (version === 4) return "ipv4";
 	if (version === 6) return "ipv6";
 	return undefined;
 }
 
-function getEmbeddedIpv4FromMappedIpv6(address: string): string | undefined {
-	const normalizedAddress = unbracketHostname(address);
-	if (isIP(normalizedAddress) !== 6) return undefined;
+function getMappedIpv4(address: string): string | undefined {
+	const normalized = stripBrackets(address);
+	if (isIP(normalized) !== 6) return undefined;
 
-	let canonicalAddress: string;
+	let canonical: string;
 	try {
-		canonicalAddress = unbracketHostname(new URL(`http://[${normalizedAddress}]/`).hostname).toLowerCase();
+		canonical = stripBrackets(new URL(`http://[${normalized}]/`).hostname).toLowerCase();
 	} catch {
-		canonicalAddress = normalizedAddress.toLowerCase();
+		canonical = normalized.toLowerCase();
 	}
 
-	const match = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(canonicalAddress);
+	const match = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(canonical);
 	if (!match) return undefined;
 
 	const high = Number.parseInt(match[1], 16);
@@ -82,29 +82,25 @@ function getEmbeddedIpv4FromMappedIpv6(address: string): string | undefined {
 	return `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`;
 }
 
-function isBlockedWebFetchIp(address: string): boolean {
-	const normalizedAddress = unbracketHostname(address);
-	const version = getIpVersion(normalizedAddress);
+function isBlockedIp(address: string): boolean {
+	const normalized = stripBrackets(address);
+	const version = getIpVersion(normalized);
 	if (version === undefined) return false;
 
 	if (version === "ipv6") {
-		const embeddedIpv4Address = getEmbeddedIpv4FromMappedIpv6(normalizedAddress);
-		if (embeddedIpv4Address && BLOCKED_WEB_FETCH_IPS.check(embeddedIpv4Address, "ipv4")) {
-			return true;
-		}
+		const mappedIpv4 = getMappedIpv4(normalized);
+		if (mappedIpv4 && BLOCKED_IPS.check(mappedIpv4, "ipv4")) return true;
 	}
 
-	return BLOCKED_WEB_FETCH_IPS.check(normalizedAddress, version);
+	return BLOCKED_IPS.check(normalized, version);
 }
 
-function isSpecialUseWebFetchHostname(hostname: string): boolean {
-	const normalizedHostname = stripTrailingDots(unbracketHostname(hostname)).toLowerCase();
-	return SPECIAL_USE_WEB_FETCH_HOSTNAMES.some(
-		(suffix) => normalizedHostname === suffix || normalizedHostname.endsWith(`.${suffix}`),
-	);
+function isSpecialUseHostname(hostname: string): boolean {
+	const normalized = normalizeHostname(hostname);
+	return SPECIAL_USE_HOSTNAMES.some((suffix) => normalized === suffix || normalized.endsWith(`.${suffix}`));
 }
 
-function safelyDecodeUrlComponent(value: string): string {
+function decodeComponent(value: string): string {
 	try {
 		return decodeURIComponent(value.replace(/\+/gu, " "));
 	} catch {
@@ -112,76 +108,72 @@ function safelyDecodeUrlComponent(value: string): string {
 	}
 }
 
-function containsSensitiveUrlFieldName(value: string): boolean {
-	const decodedValue = safelyDecodeUrlComponent(value);
-	const normalizedValue = decodedValue.replace(/([a-z])([A-Z])/g, "$1-$2");
-	return SENSITIVE_URL_FIELD_NAME_PATTERN.test(normalizedValue);
+function hasSensitiveFieldName(value: string): boolean {
+	const decoded = decodeComponent(value);
+	return SENSITIVE_FIELD_PATTERN.test(decoded.replace(/([a-z])([A-Z])/g, "$1-$2"));
 }
 
-function containsSensitiveUrlValue(value: string): boolean {
-	return SENSITIVE_URL_VALUE_PATTERN.test(value.trim());
+function hasSensitiveValue(value: string): boolean {
+	return SENSITIVE_VALUE_PATTERN.test(value.trim());
 }
 
-function containsNestedSensitiveUrlData(value: string): boolean {
-	const decodedValue = safelyDecodeUrlComponent(value);
-	return /[?&#=]/u.test(decodedValue) && containsSensitiveUrlFieldName(decodedValue);
+function hasNestedSensitiveData(value: string): boolean {
+	const decoded = decodeComponent(value);
+	return /[?&#=]/u.test(decoded) && hasSensitiveFieldName(decoded);
 }
 
-function containsSensitiveUrlParam(name: string, value: string): boolean {
-	return (
-		containsSensitiveUrlFieldName(name) || containsSensitiveUrlValue(value) || containsNestedSensitiveUrlData(value)
-	);
+function hasSensitiveParam(name: string, value: string): boolean {
+	return hasSensitiveFieldName(name) || hasSensitiveValue(value) || hasNestedSensitiveData(value);
 }
 
-function containsSensitiveUrlParams(params: Iterable<[string, string]>): boolean {
+function hasSensitiveParams(params: Iterable<[string, string]>): boolean {
 	for (const [name, value] of params) {
-		if (containsSensitiveUrlParam(name, value)) return true;
+		if (hasSensitiveParam(name, value)) return true;
 	}
-
 	return false;
 }
 
-function getFragmentUrlParams(fragment: string): URLSearchParams {
+function getFragmentParams(fragment: string): URLSearchParams {
 	const queryStart = fragment.indexOf("?");
 	return new URLSearchParams(queryStart === -1 ? fragment : fragment.slice(queryStart + 1));
 }
 
-function assertNoSensitiveUrlData(url: URL): void {
+function assertNoSensitiveData(url: URL): void {
 	if (url.username || url.password) {
 		throw new Error("web_fetch URL must not include username or password credentials");
 	}
 
-	if (containsSensitiveUrlParams(url.searchParams)) {
+	if (hasSensitiveParams(url.searchParams)) {
 		throw new Error("web_fetch URL query must not include credentials or tokens");
 	}
 
 	if (!url.hash) return;
 
-	const fragment = safelyDecodeUrlComponent(url.hash.slice(1));
+	const fragment = decodeComponent(url.hash.slice(1));
 	if (
-		containsSensitiveUrlFieldName(fragment) ||
-		containsSensitiveUrlValue(fragment) ||
-		(/[=&?]/u.test(fragment) && containsSensitiveUrlParams(getFragmentUrlParams(fragment)))
+		hasSensitiveFieldName(fragment) ||
+		hasSensitiveValue(fragment) ||
+		(/[=&?]/u.test(fragment) && hasSensitiveParams(getFragmentParams(fragment)))
 	) {
 		throw new Error("web_fetch URL fragment must not include credentials or tokens");
 	}
 }
 
-async function resolveWebFetchHost(hostname: string): Promise<ReadonlyArray<{ address: string }>> {
+async function resolveHost(hostname: string): Promise<ReadonlyArray<{ address: string }>> {
 	return lookup(hostname, { all: true, verbatim: true });
 }
 
-async function assertPublicWebFetchHost(url: URL, resolveHost: WebFetchHostResolver): Promise<void> {
-	const hostname = stripTrailingDots(unbracketHostname(url.hostname)).toLowerCase();
+async function assertPublicHost(url: URL, resolver: Resolver): Promise<void> {
+	const hostname = normalizeHostname(url.hostname);
 	if (!hostname) {
 		throw new Error("web_fetch URL must include a hostname");
 	}
 
-	if (isSpecialUseWebFetchHostname(hostname)) {
+	if (isSpecialUseHostname(hostname)) {
 		throw new Error("web_fetch URL must not target localhost or other special-use hostnames");
 	}
 
-	if (isBlockedWebFetchIp(hostname)) {
+	if (isBlockedIp(hostname)) {
 		throw new Error("web_fetch URL must not target private, local, or reserved IP addresses");
 	}
 
@@ -189,7 +181,7 @@ async function assertPublicWebFetchHost(url: URL, resolveHost: WebFetchHostResol
 
 	let addresses: ReadonlyArray<{ address: string }>;
 	try {
-		addresses = await resolveHost(hostname);
+		addresses = await resolver(hostname);
 	} catch {
 		throw new Error("web_fetch URL hostname could not be resolved");
 	}
@@ -198,15 +190,12 @@ async function assertPublicWebFetchHost(url: URL, resolveHost: WebFetchHostResol
 		throw new Error("web_fetch URL hostname did not resolve to any addresses");
 	}
 
-	if (addresses.some(({ address }) => isBlockedWebFetchIp(address))) {
+	if (addresses.some(({ address }) => isBlockedIp(address))) {
 		throw new Error("web_fetch URL hostname resolves to a private, local, or reserved IP address");
 	}
 }
 
-export async function normalizeWebFetchUrl(
-	input: string,
-	resolveHost: WebFetchHostResolver = resolveWebFetchHost,
-): Promise<string> {
+export async function normalizeUrl(input: string, resolver: Resolver = resolveHost): Promise<string> {
 	let url: URL;
 	try {
 		url = new URL(input);
@@ -218,8 +207,8 @@ export async function normalizeWebFetchUrl(
 		throw new Error("web_fetch only supports http:// and https:// URLs");
 	}
 
-	assertNoSensitiveUrlData(url);
-	await assertPublicWebFetchHost(url, resolveHost);
+	assertNoSensitiveData(url);
+	await assertPublicHost(url, resolver);
 
 	return url.href;
 }

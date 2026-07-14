@@ -7,48 +7,35 @@ import {
 	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { createWebFetchResult } from "./fetch-result.js";
-import {
-	WEB_FETCH_DUMP_MODES,
-	WEB_FETCH_WAIT_UNTIL_VALUES,
-	type WebFetchDetails,
-	type WebFetchDumpMode,
-	type WebFetchWaitUntil,
-} from "./fetch-types.js";
-import { normalizeWebFetchUrl } from "./fetch-url-policy.js";
-import { executeObscuraFetch, type ObscuraRequest } from "./obscura.js";
-import { renderWebFetchCall, renderWebFetchResult } from "./render.js";
+import { createResult } from "./fetch-result.js";
+import { DUMP_MODES, type Details, type DumpMode, WAIT_UNTIL, type WaitUntil } from "./fetch-types.js";
+import { normalizeUrl } from "./fetch-url-policy.js";
+import { execute, type Request } from "./obscura.js";
+import { renderFetchCall, renderFetchResult } from "./render.js";
 
-export type {
-	WebFetchBaseDetails,
-	WebFetchDetails,
-	WebFetchDumpMode,
-	WebFetchWaitUntil,
-} from "./fetch-types.js";
+const DEFAULT_DUMP_MODE = "markdown" satisfies DumpMode;
+const DEFAULT_WAIT_UNTIL = "load" satisfies WaitUntil;
+const DEFAULT_WAIT_SECONDS = 5;
+const DEFAULT_TIMEOUT_SECONDS = 30;
+const MAX_TIMEOUT_SECONDS = 120;
+const MAX_WAIT_SECONDS = 60;
+const MAX_URL_LENGTH = 4096;
+const MAX_EVAL_LENGTH = 5000;
+const MAX_SELECTOR_LENGTH = 1000;
+const MAX_PROXY_LENGTH = 2048;
 
-const DEFAULT_WEB_FETCH_DUMP_MODE = "markdown" satisfies WebFetchDumpMode;
-const DEFAULT_WEB_FETCH_WAIT_UNTIL = "load" satisfies WebFetchWaitUntil;
-const DEFAULT_WEB_FETCH_WAIT_SECONDS = 5;
-const DEFAULT_WEB_FETCH_TIMEOUT_SECONDS = 30;
-const MAX_WEB_FETCH_TIMEOUT_SECONDS = 120;
-const MAX_WEB_FETCH_WAIT_SECONDS = 60;
-const MAX_WEB_FETCH_URL_LENGTH = 4096;
-const MAX_WEB_FETCH_EVAL_LENGTH = 5000;
-const MAX_WEB_FETCH_SELECTOR_LENGTH = 1000;
-const MAX_WEB_FETCH_PROXY_LENGTH = 2048;
-
-const webFetchParams = Type.Object({
+const parameters = Type.Object({
 	url: Type.String({
 		description:
 			"Public HTTP(S) URL to fetch with Obscura. Local/private-network hosts, credentials, and sensitive token parameters are rejected.",
 		minLength: 1,
-		maxLength: MAX_WEB_FETCH_URL_LENGTH,
+		maxLength: MAX_URL_LENGTH,
 	}),
 	dump: Type.Optional(
-		StringEnum(WEB_FETCH_DUMP_MODES, {
+		StringEnum(DUMP_MODES, {
 			description:
 				"Output format to dump when eval is not provided. markdown preserves headings and links while removing most HTML noise. assets returns NDJSON sub-resource URLs.",
-			default: DEFAULT_WEB_FETCH_DUMP_MODE,
+			default: DEFAULT_DUMP_MODE,
 		}),
 	),
 	eval: Type.Optional(
@@ -56,48 +43,48 @@ const webFetchParams = Type.Object({
 			description:
 				"JavaScript expression to evaluate in the rendered page instead of dumping page content. Use document.querySelector(...) inside the expression when you need scoped eval output.",
 			minLength: 1,
-			maxLength: MAX_WEB_FETCH_EVAL_LENGTH,
+			maxLength: MAX_EVAL_LENGTH,
 		}),
 	),
 	selector: Type.Optional(
 		Type.String({
 			description: "Optional CSS selector to wait for before dumping output. Not valid with eval.",
 			minLength: 1,
-			maxLength: MAX_WEB_FETCH_SELECTOR_LENGTH,
+			maxLength: MAX_SELECTOR_LENGTH,
 		}),
 	),
 	waitUntil: Type.Optional(
-		StringEnum(WEB_FETCH_WAIT_UNTIL_VALUES, {
+		StringEnum(WAIT_UNTIL, {
 			description: "Navigation readiness condition before dumping or evaluating. Default: load",
-			default: DEFAULT_WEB_FETCH_WAIT_UNTIL,
+			default: DEFAULT_WAIT_UNTIL,
 		}),
 	),
 	wait: Type.Optional(
 		Type.Integer({
-			description: `Extra time to wait after navigation, in seconds (default ${DEFAULT_WEB_FETCH_WAIT_SECONDS})`,
+			description: `Extra time to wait after navigation, in seconds (default ${DEFAULT_WAIT_SECONDS})`,
 			minimum: 0,
-			maximum: MAX_WEB_FETCH_WAIT_SECONDS,
-			default: DEFAULT_WEB_FETCH_WAIT_SECONDS,
+			maximum: MAX_WAIT_SECONDS,
+			default: DEFAULT_WAIT_SECONDS,
 		}),
 	),
 	timeout: Type.Optional(
 		Type.Integer({
-			description: `Navigation timeout in seconds (default ${DEFAULT_WEB_FETCH_TIMEOUT_SECONDS}, max ${MAX_WEB_FETCH_TIMEOUT_SECONDS})`,
+			description: `Navigation timeout in seconds (default ${DEFAULT_TIMEOUT_SECONDS}, max ${MAX_TIMEOUT_SECONDS})`,
 			minimum: 1,
-			maximum: MAX_WEB_FETCH_TIMEOUT_SECONDS,
-			default: DEFAULT_WEB_FETCH_TIMEOUT_SECONDS,
+			maximum: MAX_TIMEOUT_SECONDS,
+			default: DEFAULT_TIMEOUT_SECONDS,
 		}),
 	),
 	proxy: Type.Optional(
 		Type.String({
 			description: "Optional HTTP or SOCKS proxy URL to pass to Obscura",
 			minLength: 1,
-			maxLength: MAX_WEB_FETCH_PROXY_LENGTH,
+			maxLength: MAX_PROXY_LENGTH,
 		}),
 	),
 });
 
-function normalizeOptionalText(value: string | undefined): string | undefined {
+function normalizeText(value: string | undefined): string | undefined {
 	const trimmed = value?.trim();
 	return trimmed ? trimmed : undefined;
 }
@@ -105,11 +92,11 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 /**
  * Register the `web_fetch` tool, which renders and dumps a URL through Obscura.
  */
-export function registerWebFetchTool(pi: ExtensionAPI): void {
+export function registerTool(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "web_fetch",
 		label: "Web Fetch",
-		description: `Fetch a specific public HTTP(S) URL with Obscura. Obscura stealth mode is always enabled. Defaults to markdown output and a ${DEFAULT_WEB_FETCH_WAIT_SECONDS}-second post-navigation settle wait. Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first); large or truncated output is saved to a temp file. Binary/raw responses are intentionally not supported by this tool.`,
+		description: `Fetch a specific public HTTP(S) URL with Obscura. Obscura stealth mode is always enabled. Defaults to Markdown output and a ${DEFAULT_WAIT_SECONDS}-second post-navigation settle wait. Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first); large or truncated output is saved to a temp file. Binary/raw responses are intentionally not supported by this tool.`,
 		promptSnippet:
 			"Fetch a specific public URL with Obscura stealth mode and return markdown, text, HTML, links, assets, or JavaScript evaluation output.",
 		promptGuidelines: [
@@ -120,17 +107,17 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 			"web_fetch always enables Obscura stealth mode. Do not use web_fetch to bypass logins, paywalls, CAPTCHAs, rate limits, robots restrictions, or other access controls.",
 			"When using web_fetch results in an answer about external web content, cite the fetched URL.",
 		],
-		parameters: webFetchParams,
+		parameters,
 
-		async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<WebFetchDetails>> {
-			const url = await normalizeWebFetchUrl(params.url);
-			const evalScript = normalizeOptionalText(params.eval);
-			const selector = normalizeOptionalText(params.selector);
-			const proxy = normalizeOptionalText(params.proxy);
-			const dump = params.dump ?? DEFAULT_WEB_FETCH_DUMP_MODE;
-			const waitUntil = params.waitUntil ?? DEFAULT_WEB_FETCH_WAIT_UNTIL;
-			const wait = params.wait ?? DEFAULT_WEB_FETCH_WAIT_SECONDS;
-			const timeout = params.timeout ?? DEFAULT_WEB_FETCH_TIMEOUT_SECONDS;
+		async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<Details>> {
+			const url = await normalizeUrl(params.url);
+			const evalScript = normalizeText(params.eval);
+			const selector = normalizeText(params.selector);
+			const proxy = normalizeText(params.proxy);
+			const dump = params.dump ?? DEFAULT_DUMP_MODE;
+			const waitUntil = params.waitUntil ?? DEFAULT_WAIT_UNTIL;
+			const wait = params.wait ?? DEFAULT_WAIT_SECONDS;
+			const timeout = params.timeout ?? DEFAULT_TIMEOUT_SECONDS;
 
 			if (evalScript && params.dump !== undefined) {
 				throw new Error("Pass either eval or dump, not both");
@@ -146,20 +133,20 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 				timeout,
 				...(proxy ? { proxy } : {}),
 			};
-			const request: ObscuraRequest = evalScript
+			const request: Request = evalScript
 				? { ...commonRequest, mode: "eval", script: evalScript }
 				: { ...commonRequest, mode: "dump", dump, ...(selector ? { selector } : {}) };
 			const startedAt = Date.now();
-			const execution = await executeObscuraFetch(request, {
+			const execution = await execute(request, {
 				exec: (command, args, options) => pi.exec(command, args, options),
 				cwd: ctx.cwd,
 				signal,
 			});
 
-			return createWebFetchResult(request, execution, Date.now() - startedAt);
+			return createResult(request, execution, Date.now() - startedAt);
 		},
 
-		renderCall: renderWebFetchCall,
-		renderResult: renderWebFetchResult,
+		renderCall: renderFetchCall,
+		renderResult: renderFetchResult,
 	});
 }

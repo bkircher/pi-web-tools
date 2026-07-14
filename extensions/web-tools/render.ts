@@ -1,40 +1,22 @@
-import { formatSize, type AgentToolResult, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+	formatSize,
+	type AgentToolResult,
+	type Theme,
+	type ToolDefinition,
+	type ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import type { Details as FetchDetails } from "./fetch-types.js";
+import type { Details as SearchDetails } from "./search-types.js";
 
-export type WebToolRenderOptions = {
-	expanded: boolean;
-	isPartial: boolean;
-};
+type RenderContext = Pick<Parameters<NonNullable<ToolDefinition["renderResult"]>>[3], "isError">;
 
-export type WebToolRenderContext = {
-	isError: boolean;
-};
+export const SEARCH_URL = "https://html.duckduckgo.com/html/";
 
-type SearchRenderMetadata = {
-	status?: number;
-	bytes?: number;
-	cached: boolean;
-	elapsedMs: number;
-};
+const UNSAFE_TERMINAL_PATTERN = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
 
-type SearchRenderDetails = SearchRenderMetadata &
-	({ results: unknown[]; resultCount?: number } | { results?: undefined; resultCount: number });
-
-type FetchRenderDetails = {
-	mode: "dump" | "eval";
-	dump?: string;
-	bytes: number;
-	elapsedMs: number;
-	truncated: boolean;
-	stderr?: string;
-};
-
-export const DUCKDUCKGO_SEARCH_URL = "https://html.duckduckgo.com/html/";
-
-const UNSAFE_TERMINAL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
-
-function escapeUnsafeTerminalCharacters(value: string): string {
-	return value.replace(UNSAFE_TERMINAL_CHARACTER_PATTERN, (character) => {
+function escapeUnsafeCharacters(value: string): string {
+	return value.replace(UNSAFE_TERMINAL_PATTERN, (character) => {
 		const codePoint = character.codePointAt(0)!;
 		return `\\u${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
 	});
@@ -44,58 +26,54 @@ function getDisplayUrl(value: string): string {
 	try {
 		return new URL(value).href;
 	} catch {
-		return escapeUnsafeTerminalCharacters(value);
+		return escapeUnsafeCharacters(value);
 	}
 }
 
-export function buildDuckDuckGoSearchUrl(query: string): URL {
-	const url = new URL(DUCKDUCKGO_SEARCH_URL);
+export function buildSearchUrl(query: string): URL {
+	const url = new URL(SEARCH_URL);
 	url.searchParams.set("q", query);
 	url.searchParams.set("kl", "wt-wt");
 	url.searchParams.set("kp", "-1");
 	return url;
 }
 
-function getResultText(result: AgentToolResult<unknown>): string {
+function getResultText<TDetails>(result: AgentToolResult<TDetails>): string {
 	return result.content
 		.filter((block): block is { type: "text"; text: string } => block.type === "text")
 		.map((block) => block.text)
 		.join("\n");
 }
 
-export function renderWebSearchCall(args: { query?: string }, theme: Theme): Text {
+export function renderSearchCall(args: { query?: string }, theme: Theme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Search"));
 	const query = args.query?.trim();
 	if (!query) return new Text(title, 0, 0);
 
-	const searchUrl = buildDuckDuckGoSearchUrl(query).href;
+	const searchUrl = buildSearchUrl(query).href;
 	return new Text(`${title} ${theme.fg("accent", searchUrl)}`, 0, 0);
 }
 
-export function renderWebSearchResult(
-	result: AgentToolResult<unknown>,
-	{ expanded, isPartial }: WebToolRenderOptions,
+export function renderSearchResult(
+	result: AgentToolResult<SearchDetails>,
+	{ expanded, isPartial }: ToolRenderResultOptions,
 	theme: Theme,
-	context: WebToolRenderContext,
+	context: RenderContext,
 ): Text {
 	if (isPartial) return new Text(theme.fg("warning", "Searching…"), 0, 0);
 
 	const output = getResultText(result);
-	const details = result.details as SearchRenderDetails | undefined;
+	const details = result.details;
 	if (context.isError || !details) {
 		return new Text(theme.fg("error", output || "Search failed"), 0, 0);
 	}
 
-	const count = details.results?.length ?? details.resultCount;
-	if (count === undefined) {
-		return new Text(theme.fg("error", output || "Search result details unavailable"), 0, 0);
-	}
-
+	const count = details.results.length;
 	const summary = [
 		count === 0 ? "No results" : "✓",
-		details.status === undefined ? undefined : `HTTP ${details.status}`,
+		`HTTP ${details.status}`,
 		count === 0 ? undefined : `${count} ${count === 1 ? "result" : "results"}`,
-		details.bytes === undefined ? undefined : `${formatSize(details.bytes)} HTML`,
+		`${formatSize(details.bytes)} HTML`,
 		`${details.elapsedMs}ms`,
 		details.cached ? "cached" : undefined,
 	]
@@ -106,21 +84,21 @@ export function renderWebSearchResult(
 	return new Text(text, 0, 0);
 }
 
-export function renderWebFetchCall(args: { url?: string }, theme: Theme): Text {
+export function renderFetchCall(args: { url?: string }, theme: Theme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Fetch"));
 	return new Text(args.url ? `${title} ${theme.fg("accent", getDisplayUrl(args.url))}` : title, 0, 0);
 }
 
-export function renderWebFetchResult(
-	result: AgentToolResult<unknown>,
-	{ expanded, isPartial }: WebToolRenderOptions,
+export function renderFetchResult(
+	result: AgentToolResult<FetchDetails>,
+	{ expanded, isPartial }: ToolRenderResultOptions,
 	theme: Theme,
-	context: WebToolRenderContext,
+	context: RenderContext,
 ): Text {
 	if (isPartial) return new Text(theme.fg("warning", "Fetching…"), 0, 0);
 
 	const output = getResultText(result);
-	const details = result.details as FetchRenderDetails | undefined;
+	const details = result.details;
 	if (context.isError || !details) {
 		return new Text(theme.fg("error", output || "Fetch failed"), 0, 0);
 	}

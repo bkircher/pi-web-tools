@@ -1,31 +1,22 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerWebFetchTool } from "./fetch.js";
-import { registerWebSearchTool } from "./search.js";
+import { registerTool as registerFetchTool } from "./fetch.js";
+import { registerTool as registerSearchTool } from "./search.js";
 
-/**
- * Registers the DuckDuckGo-backed `web_search` tool.
- */
-export { registerWebSearchTool } from "./search.js";
+/** Registers the DuckDuckGo-backed `web_search` tool. */
+export { registerTool as registerSearchTool } from "./search.js";
 
-/**
- * Details returned by the `web_search` tool.
- */
-export type { SearchResult, WebSearchDetails } from "./search.js";
+/** Details returned by the `web_search` tool. */
+export type { Result as SearchResult } from "./duckduckgo.js";
+export type { Details as SearchDetails } from "./search-types.js";
 
-/**
- * Registers the Obscura-backed `web_fetch` tool.
- */
-export { registerWebFetchTool } from "./fetch.js";
+/** Registers the Obscura-backed `web_fetch` tool. */
+export { registerTool as registerFetchTool } from "./fetch.js";
 
-/**
- * Details returned by the `web_fetch` tool.
- */
-export type { WebFetchBaseDetails, WebFetchDetails, WebFetchDumpMode, WebFetchWaitUntil } from "./fetch.js";
+/** Details returned by the `web_fetch` tool. */
+export type { Details as FetchDetails, DumpMode, WaitUntil } from "./fetch-types.js";
 
-/**
- * pi extension entry point that installs both web tools.
- */
+/** Installs both web tools. */
 export default function webToolsExtension(pi: ExtensionAPI): void {
-	registerWebSearchTool(pi);
-	registerWebFetchTool(pi);
+	registerSearchTool(pi);
+	registerFetchTool(pi);
 }

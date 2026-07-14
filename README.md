@@ -108,9 +108,10 @@ exfiltration.
 - Reserved-name coverage is not exhaustive; some special-use hostnames and
   IPv4-mapped IPv6 addresses in reserved ranges may not be rejected. Complete
   coverage is difficult to guarantee.
-- Sensitive URL detection is heuristic; token-like values hidden inside encoded
-  URLs nested within another URL may be missed. Complete detection is difficult
-  to guarantee.
+- Sensitive URL detection is heuristic. Query and fragment data is inspected
+  through at most two URL-form decoding passes; token-like values hidden more
+  deeply inside nested URLs may be missed. Complete detection is difficult to
+  guarantee.
 
 Run pi in `sandbox-exec(1)` with Little Snitch, or otherwise isolate it from
 private data and infrastructure, to reduce the risk of exfiltration attacks.

@@ -20,13 +20,94 @@ test("rejects URL credentials", async () => {
 	await assert.rejects(result, { message: "web_fetch URL must not include username or password credentials" });
 });
 
-test("rejects sensitive URL query parameters", async () => {
-	const input = "https://example.com/docs?access_token=secret-value";
+const sensitiveUrlCases = [
+	{
+		name: "plain query field names",
+		input: "https://example.com/docs?access_token=secret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "encoded query field names",
+		input: "https://example.com/docs?access%5Ftoken=secret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "double-encoded query field names",
+		input: "https://example.com/docs?access%255Ftoken=secret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "encoded query fields alongside malformed escapes",
+		input: "https://example.com/docs?ignored=%&access%5Ftoken=secret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "encoded token-like query values",
+		input: "https://example.com/docs?value=%67hp_1234567890",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "sensitive fields in encoded nested query URLs",
+		input: "https://example.com/docs?redirect=https%3A%2F%2Fclient.example%2Fcallback%3Faccess%5Ftoken%3Dsecret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "sensitive fields in double-encoded nested query URLs",
+		input: "https://example.com/docs?redirect=https%253A%252F%252Fclient.example%252Fcallback%253Faccess%255Ftoken%253Dsecret-value",
+		expectedMessage: "web_fetch URL query must not include credentials or tokens",
+	},
+	{
+		name: "plain fragment field names",
+		input: "https://example.com/docs#access_token=secret-value",
+		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
+	},
+	{
+		name: "encoded fragment field names",
+		input: "https://example.com/docs#access%5Ftoken%3Dsecret-value",
+		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
+	},
+	{
+		name: "double-encoded fragment field names",
+		input: "https://example.com/docs#access%255Ftoken%253Dsecret-value",
+		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
+	},
+	{
+		name: "sensitive fields in encoded nested fragment URLs",
+		input: "https://example.com/docs#callback?redirect=https%3A%2F%2Fclient.example%2F%3Faccess%5Ftoken%3Dsecret-value",
+		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
+	},
+] as const;
 
-	const result = normalizeUrl(input, resolvePublicHost);
+for (const { name, input, expectedMessage } of sensitiveUrlCases) {
+	test(`rejects ${name}`, async () => {
+		const result = normalizeUrl(input, resolvePublicHost);
 
-	await assert.rejects(result, { message: "web_fetch URL query must not include credentials or tokens" });
-});
+		await assert.rejects(result, { message: expectedMessage });
+	});
+}
+
+const allowedSensitiveLookingUrlCases = [
+	{
+		name: "non-field query values",
+		input: "https://example.com/docs?q=access_token",
+	},
+	{
+		name: "query data beyond two decoding layers",
+		input: "https://example.com/docs?access%25255Ftoken=public",
+	},
+	{
+		name: "fragment data beyond two decoding layers",
+		input: "https://example.com/docs#access%25255Ftoken%25253Dpublic",
+	},
+] as const;
+
+for (const { name, input } of allowedSensitiveLookingUrlCases) {
+	test(`allows ${name}`, async () => {
+		const result = await normalizeUrl(input, resolvePublicHost);
+
+		assert.equal(result, input);
+	});
+}
 
 test("rejects special-use hostnames before DNS resolution", async () => {
 	const input = "https://service.local/docs";

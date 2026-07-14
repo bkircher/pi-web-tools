@@ -80,14 +80,15 @@ test("persists truncated stdout fallback output before deleting the working dire
 	const stdout = "a".repeat(51_201);
 	let retainedSource: ObscuraOutputSource["source"] | undefined;
 	let removedWorkingDirectory: string | undefined;
-	const storage: ObscuraStorage = {
+	const storage: ObscuraStorage & { retainedOutputPath: string } = {
+		retainedOutputPath: "/retained/output.txt",
 		createWorkingDirectory: async () => "/work",
 		readOutputFile: async () => {
 			throw new Error("missing output file");
 		},
-		retainOutput: async (source) => {
+		async retainOutput(source) {
 			retainedSource = source.source;
-			return "/retained/output.txt";
+			return this.retainedOutputPath;
 		},
 		removeWorkingDirectory: async (path) => {
 			removedWorkingDirectory = path;

@@ -1,5 +1,5 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type, type Static } from "typebox";
 import { parseHtml, type Result } from "./duckduckgo.js";
 import { buildSearchUrl, renderSearchCall, renderSearchResult, SEARCH_URL } from "./render.js";
 import type { Details, ResponseData } from "./search-types.js";
@@ -32,6 +32,8 @@ const parameters = Type.Object({
 		}),
 	),
 });
+
+export type SearchParameters = Static<typeof parameters>;
 
 function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();

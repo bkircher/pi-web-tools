@@ -21,39 +21,8 @@ function renderLines(component: { render(width: number): string[] }): string[] {
 	return component.render(500).map((line) => line.trimEnd());
 }
 
-test("web_search renders the exact DuckDuckGo request URL", () => {
-	const component = renderWebSearchCall({ query: "pnpm docs" }, theme);
-
-	const lines = renderLines(component);
-
-	assert.deepEqual(lines, ["Web Search https://html.duckduckgo.com/html/?q=pnpm+docs&kl=wt-wt&kp=-1"]);
-});
-
-test("web_search keeps result content hidden in the collapsed summary", () => {
-	const result: AgentToolResult<SearchDetails> = {
-		content: [{ type: "text", text: "1. pnpm\n   https://pnpm.io/" }],
-		details: {
-			searchUrl: "https://html.duckduckgo.com/html/?q=pnpm",
-			status: 200,
-			bytes: 123,
-			results: [
-				{ title: "pnpm", url: "https://pnpm.io/" },
-				{ title: "Docs", url: "https://pnpm.io/motivation" },
-			],
-			query: "pnpm",
-			limit: 10,
-			cached: false,
-			elapsedMs: 42,
-		},
-	};
-
-	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
-
-	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 2 results · 123B HTML · 42ms"]);
-});
-
-test("web_search displays result content when expanded", () => {
-	const result: AgentToolResult<SearchDetails> = {
+function createSearchResult(overrides: Partial<SearchDetails> = {}): AgentToolResult<SearchDetails> {
+	return {
 		content: [{ type: "text", text: "1. pnpm\n   https://pnpm.io/" }],
 		details: {
 			searchUrl: "https://html.duckduckgo.com/html/?q=pnpm",
@@ -64,8 +33,55 @@ test("web_search displays result content when expanded", () => {
 			limit: 10,
 			cached: true,
 			elapsedMs: 3,
+			...overrides,
 		},
 	};
+}
+
+function createFetchResult(): AgentToolResult<WebFetchDetails> {
+	return {
+		content: [{ type: "text", text: "# Example\n\nFetched page content" }],
+		details: {
+			url: "https://example.com/",
+			waitUntil: "load",
+			wait: 5,
+			timeout: 30,
+			stealth: true,
+			proxy: false,
+			mode: "dump",
+			dump: "markdown",
+			bytes: 2048,
+			elapsedMs: 750,
+			truncated: false,
+		},
+	};
+}
+
+test("web_search renders the exact DuckDuckGo request URL", () => {
+	const component = renderWebSearchCall({ query: "pnpm docs" }, theme);
+
+	const lines = renderLines(component);
+
+	assert.deepEqual(lines, ["Web Search https://html.duckduckgo.com/html/?q=pnpm+docs&kl=wt-wt&kp=-1"]);
+});
+
+test("web_search keeps result content hidden in the collapsed summary", () => {
+	const result = createSearchResult({
+		results: [
+			{ title: "pnpm", url: "https://pnpm.io/" },
+			{ title: "Docs", url: "https://pnpm.io/motivation" },
+		],
+		cached: false,
+		elapsedMs: 42,
+	});
+
+	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
+
+	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 2 results · 123B HTML · 42ms"]);
+});
+
+test("web_search displays result content when expanded", () => {
+	const result = createSearchResult();
 
 	const component = renderWebSearchResult(result, { expanded: true, isPartial: false }, theme, renderContext);
 
@@ -101,22 +117,7 @@ test("web_fetch escapes terminal control characters in invalid URLs", () => {
 });
 
 test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
-	const result: AgentToolResult<WebFetchDetails> = {
-		content: [{ type: "text", text: "# Example\n\nFetched page content" }],
-		details: {
-			url: "https://example.com/",
-			waitUntil: "load",
-			wait: 5,
-			timeout: 30,
-			stealth: true,
-			proxy: false,
-			mode: "dump",
-			dump: "markdown",
-			bytes: 2048,
-			elapsedMs: 750,
-			truncated: false,
-		},
-	};
+	const result = createFetchResult();
 
 	const component = renderWebFetchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
 
@@ -124,22 +125,7 @@ test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
 });
 
 test("web_fetch displays fetched content when expanded", () => {
-	const result: AgentToolResult<WebFetchDetails> = {
-		content: [{ type: "text", text: "# Example\n\nFetched page content" }],
-		details: {
-			url: "https://example.com/",
-			waitUntil: "load",
-			wait: 5,
-			timeout: 30,
-			stealth: true,
-			proxy: false,
-			mode: "dump",
-			dump: "markdown",
-			bytes: 2048,
-			elapsedMs: 750,
-			truncated: false,
-		},
-	};
+	const result = createFetchResult();
 
 	const component = renderWebFetchResult(result, { expanded: true, isPartial: false }, theme, renderContext);
 

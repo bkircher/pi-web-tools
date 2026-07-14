@@ -2,14 +2,15 @@ import {
 	formatSize,
 	type AgentToolResult,
 	type Theme,
-	type ToolDefinition,
 	type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import type { FetchParameters } from "./fetch.js";
 import type { Details as FetchDetails } from "./fetch-types.js";
+import type { SearchParameters } from "./search.js";
 import type { Details as SearchDetails } from "./search-types.js";
 
-type RenderContext = Pick<Parameters<NonNullable<ToolDefinition["renderResult"]>>[3], "isError">;
+type RenderContext = { isError: boolean };
 
 export const SEARCH_URL = "https://html.duckduckgo.com/html/";
 
@@ -38,14 +39,14 @@ export function buildSearchUrl(query: string): URL {
 	return url;
 }
 
-function getResultText<TDetails>(result: AgentToolResult<TDetails>): string {
+function getResultText(result: AgentToolResult<unknown>): string {
 	return result.content
 		.filter((block): block is { type: "text"; text: string } => block.type === "text")
 		.map((block) => block.text)
 		.join("\n");
 }
 
-export function renderSearchCall(args: { query?: string }, theme: Theme): Text {
+export function renderSearchCall(args: SearchParameters, theme: Theme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Search"));
 	const query = args.query?.trim();
 	if (!query) return new Text(title, 0, 0);
@@ -84,7 +85,7 @@ export function renderSearchResult(
 	return new Text(text, 0, 0);
 }
 
-export function renderFetchCall(args: { url?: string }, theme: Theme): Text {
+export function renderFetchCall(args: FetchParameters, theme: Theme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Fetch"));
 	return new Text(args.url ? `${title} ${theme.fg("accent", getDisplayUrl(args.url))}` : title, 0, 0);
 }

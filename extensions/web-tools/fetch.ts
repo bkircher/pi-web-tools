@@ -6,7 +6,7 @@ import {
 	type AgentToolResult,
 	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type, type Static } from "typebox";
 import { createResult } from "./fetch-result.js";
 import { DUMP_MODES, type Details, type DumpMode, WAIT_UNTIL, type WaitUntil } from "./fetch-types.js";
 import { normalizeUrl } from "./fetch-url-policy.js";
@@ -83,6 +83,8 @@ const parameters = Type.Object({
 		}),
 	),
 });
+
+export type FetchParameters = Static<typeof parameters>;
 
 function normalizeText(value: string | undefined): string | undefined {
 	const trimmed = value?.trim();

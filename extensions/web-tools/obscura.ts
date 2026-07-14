@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecOptions, ExecResult } from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "./fetch-types.js";
-import { scan, type ScanResult } from "./output.ts";
+import { scan, type ScanResult } from "./output.js";
 
 type RequestBase = {
 	url: string;
@@ -103,16 +103,13 @@ async function getOutputSource(storage: Storage, outputPath: string, stdout: str
 	}
 }
 
-async function prepareOutput(
-	source: OutputSource,
-	retain: (source: OutputSource) => Promise<string>,
-): Promise<PreparedOutput> {
+async function prepareOutput(source: OutputSource, storage: Storage): Promise<PreparedOutput> {
 	if (!source.scan.truncation.truncated) return { retention: "discard", scan: source.scan };
 
 	return {
 		retention: "retain",
 		scan: source.scan,
-		fullOutputPath: await retain(source),
+		fullOutputPath: await storage.retainOutput(source),
 	};
 }
 
@@ -142,7 +139,7 @@ export async function execute(request: Request, options: ExecuteOptions): Promis
 		assertSucceeded(result);
 
 		const source = await getOutputSource(storage, outputPath, result.stdout);
-		const output = await prepareOutput(source, storage.retainOutput);
+		const output = await prepareOutput(source, storage);
 		const stderr = result.stderr.trim();
 		return {
 			output,

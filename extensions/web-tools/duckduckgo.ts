@@ -33,18 +33,21 @@ function pushChildrenInReverse(stack: Node[], node: ParentNode): void {
 	}
 }
 
-function* walkElements(root: ParentNode): Generator<Element> {
+function* walkNodes(root: ParentNode, shouldDescend?: (element: Element) => boolean): Generator<Node> {
 	const stack: Node[] = [];
 	pushChildrenInReverse(stack, root);
 
 	while (stack.length > 0) {
-		const node = stack.pop();
-		if (!node) break;
+		const node = stack.pop()!;
+		yield node;
 
-		if (isElement(node)) {
-			yield node;
-			pushChildrenInReverse(stack, node);
-		}
+		if (isElement(node) && (shouldDescend?.(node) ?? true)) pushChildrenInReverse(stack, node);
+	}
+}
+
+function* walkElements(root: ParentNode): Generator<Element> {
+	for (const node of walkNodes(root)) {
+		if (isElement(node)) yield node;
 	}
 }
 
@@ -66,19 +69,9 @@ function findClosestResultContainer(element: Element): Element | undefined {
 
 function textContent(root: ParentNode): string {
 	const parts: string[] = [];
-	const stack: Node[] = [];
-	pushChildrenInReverse(stack, root);
 
-	while (stack.length > 0) {
-		const node = stack.pop();
-		if (!node) break;
-
-		if (isTextNode(node)) {
-			parts.push(node.value);
-			continue;
-		}
-		if (isElement(node) && (node.tagName === "script" || node.tagName === "style")) continue;
-		if (isElement(node)) pushChildrenInReverse(stack, node);
+	for (const node of walkNodes(root, (element) => element.tagName !== "script" && element.tagName !== "style")) {
+		if (isTextNode(node)) parts.push(node.value);
 	}
 
 	return parts.join("").replace(/\s+/gu, " ").trim();

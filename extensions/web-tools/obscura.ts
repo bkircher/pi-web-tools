@@ -90,10 +90,15 @@ export function buildArgs(request: Request, outputPath: string): string[] {
 	return args;
 }
 
+function isFileNotFoundError(error: unknown): boolean {
+	return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
 async function getOutputSource(storage: Storage, outputPath: string, stdout: string): Promise<OutputSource> {
 	try {
 		return { source: "file", path: outputPath, scan: await storage.readOutputFile(outputPath) };
-	} catch {
+	} catch (error) {
+		if (!isFileNotFoundError(error)) throw error;
 		if (!stdout) throw new Error(`obscura fetch produced no readable output at ${outputPath}`);
 		return {
 			source: "stdout",

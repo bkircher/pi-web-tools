@@ -84,7 +84,7 @@ test("persists truncated stdout fallback output before deleting the working dire
 		retainedOutputPath: "/retained/output.txt",
 		createWorkingDirectory: async () => "/work",
 		readOutputFile: async () => {
-			throw new Error("missing output file");
+			throw Object.assign(new Error("missing output file"), { code: "ENOENT" });
 		},
 		async retainOutput(source) {
 			retainedSource = source.source;
@@ -103,6 +103,23 @@ test("persists truncated stdout fallback output before deleting the working dire
 	assert.equal(result.output.fullOutputPath, "/retained/output.txt");
 	assert.equal(retainedSource, "stdout");
 	assert.equal(removedWorkingDirectory, "/work");
+});
+
+test("propagates output file read errors instead of falling back to stdout", async () => {
+	const readError = Object.assign(new Error("permission denied"), { code: "EACCES" });
+	const storage: ObscuraStorage = {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw readError;
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => {},
+	};
+	const exec = async () => ({ stdout: "fallback output", stderr: "", code: 0, killed: false });
+
+	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
+
+	await assert.rejects(result, (error) => error === readError);
 });
 
 test("deletes the working directory when Obscura fails", async () => {

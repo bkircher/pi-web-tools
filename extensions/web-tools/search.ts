@@ -15,6 +15,7 @@ const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
 const MAX_LIMIT = 20;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const SEARCH_TIMEOUT_SECONDS = 10;
 
 const cache = new Map<string, CacheEntry>();
 
@@ -67,9 +68,34 @@ function setCached(query: string, response: ResponseData): void {
 	}
 }
 
-function makeSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
-	const timeoutSignal = AbortSignal.timeout(timeoutMs);
-	return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+function makeSignals(signal: AbortSignal | undefined): {
+	requestSignal: AbortSignal;
+	timeoutSignal: AbortSignal;
+} {
+	const timeoutSignal = AbortSignal.timeout(SEARCH_TIMEOUT_SECONDS * 1000);
+	return {
+		requestSignal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+		timeoutSignal,
+	};
+}
+
+function formatNetworkError(error: unknown): string {
+	const rootMessage = error instanceof Error && error.message ? error.message : String(error);
+	const cause = error instanceof Error ? error.cause : undefined;
+	const causes = cause instanceof AggregateError ? cause.errors : cause === undefined ? [] : [cause];
+	const codes = causes
+		.map((value) =>
+			typeof value === "object" && value !== null && "code" in value && typeof value.code === "string"
+				? value.code
+				: undefined,
+		)
+		.filter((code): code is string => code !== undefined);
+
+	if (codes.length > 0) return `${rootMessage} (${[...new Set(codes)].join(", ")})`;
+	const causeMessage = causes.find(
+		(value): value is Error => value instanceof Error && Boolean(value.message),
+	)?.message;
+	return causeMessage ? `${rootMessage} (cause: ${causeMessage})` : rootMessage;
 }
 
 function formatResults(results: Result[]): string {
@@ -137,16 +163,30 @@ function getRedirectHostname(location: string, baseUrl: URL): string | undefined
 
 async function fetchHtml(query: string, signal: AbortSignal | undefined): Promise<ResponseData> {
 	const url = buildSearchUrl(query);
+	const { requestSignal, timeoutSignal } = makeSignals(signal);
+	let response: Response;
 
-	const response = await fetch(url, {
-		headers: {
-			accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-			"accept-language": "en-US,en;q=0.9",
-			"user-agent": "Mozilla/5.0",
-		},
-		redirect: "manual",
-		signal: makeSignal(signal, 10_000),
-	});
+	try {
+		response = await fetch(url, {
+			headers: {
+				accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+				"accept-language": "en-US,en;q=0.9",
+				"user-agent": "Mozilla/5.0",
+			},
+			redirect: "manual",
+			signal: requestSignal,
+		});
+	} catch (error) {
+		if (timeoutSignal.aborted && requestSignal.reason === timeoutSignal.reason) {
+			throw new Error(`DuckDuckGo search timed out after ${SEARCH_TIMEOUT_SECONDS} seconds`, { cause: error });
+		}
+		if (signal?.aborted && requestSignal.reason === signal.reason) {
+			throw new Error("DuckDuckGo search was cancelled", { cause: error });
+		}
+		throw new Error(`DuckDuckGo request failed before an HTTP response: ${formatNetworkError(error)}`, {
+			cause: error,
+		});
+	}
 
 	if (isRedirectStatus(response.status)) {
 		const location = response.headers.get("location");

@@ -23,6 +23,17 @@ function getSearchTool(): SearchTool {
 	return tool;
 }
 
+test("web_search reports a DuckDuckGo anti-bot challenge", async (context) => {
+	context.mock.method(globalThis, "fetch", async () => new Response("challenge", { status: 202 }));
+	const tool = getSearchTool();
+
+	const result = tool.execute("anti-bot-challenge", { query: "challenge test" }, undefined);
+
+	await assert.rejects(result, {
+		message: "DuckDuckGo blocked the search with an anti-bot challenge (HTTP 202)",
+	});
+});
+
 test("web_search reports the network error code hidden by fetch", async (context) => {
 	const cause = Object.assign(new Error("getaddrinfo ENOTFOUND html.duckduckgo.com"), { code: "ENOTFOUND" });
 	context.mock.method(globalThis, "fetch", async () => {

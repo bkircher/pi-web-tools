@@ -202,6 +202,9 @@ async function fetchHtml(query: string, signal: AbortSignal | undefined): Promis
 	}
 
 	const { html, bytes } = await readHtml(response);
+	if (response.status === 202) {
+		throw new Error("DuckDuckGo blocked the search with an anti-bot challenge (HTTP 202)");
+	}
 	return {
 		searchUrl: url.href,
 		status: response.status,

@@ -48,6 +48,21 @@ test("web_search reports the network error code hidden by fetch", async (context
 	});
 });
 
+test("web_search does not retry a reset connection", async (context) => {
+	const cause = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+	const fetchMock = context.mock.method(globalThis, "fetch", async () => {
+		throw new TypeError("fetch failed", { cause });
+	});
+	const tool = getSearchTool();
+
+	const result = tool.execute("connection-reset", { query: "connection reset test" }, undefined);
+
+	await assert.rejects(result, {
+		message: "DuckDuckGo request failed before an HTTP response: fetch failed (ECONNRESET)",
+	});
+	assert.equal(fetchMock.mock.callCount(), 1);
+});
+
 test("web_search reports a timeout separately", async (context) => {
 	const timeoutController = new AbortController();
 	timeoutController.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError"));

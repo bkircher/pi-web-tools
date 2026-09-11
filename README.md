@@ -24,6 +24,8 @@ Parameters:
 
 Use `web_search` for discovery. Its compact summary includes the DuckDuckGo HTTP
 status, response HTML size, result count, elapsed time, and cache status.
+Concurrent network requests are serialized, and queued requests start at least
+one second apart.
 
 ### `web_fetch`
 

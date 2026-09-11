@@ -16,8 +16,12 @@ const MAX_QUERY_LENGTH = 500;
 const MAX_LIMIT = 20;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const SEARCH_TIMEOUT_SECONDS = 10;
+const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
 const cache = new Map<string, CacheEntry>();
+let searchQueue: Promise<void> = Promise.resolve();
+let activeOrQueuedSearches = 0;
+let lastSearchStartedAt = 0;
 
 const parameters = Type.Object({
 	query: Type.String({
@@ -77,6 +81,45 @@ function makeSignals(signal: AbortSignal | undefined): {
 		requestSignal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
 		timeoutSignal,
 	};
+}
+
+function getSearchResponse(
+	query: string,
+	signal: AbortSignal | undefined,
+): Promise<{ response: ResponseData; cached: boolean }> {
+	const cachedResponse = getCached(query);
+	if (cachedResponse) return Promise.resolve({ response: cachedResponse, cached: true });
+
+	const mustWaitForInterval = activeOrQueuedSearches > 0;
+	activeOrQueuedSearches += 1;
+
+	const result = searchQueue.then(async () => {
+		if (signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
+
+		const queuedResponse = getCached(query);
+		if (queuedResponse) return { response: queuedResponse, cached: true };
+
+		if (mustWaitForInterval) {
+			const waitMs = Math.max(0, lastSearchStartedAt + MIN_QUEUED_SEARCH_INTERVAL_MS - Date.now());
+			if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+			if (signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
+		}
+
+		lastSearchStartedAt = Date.now();
+		const response = await fetchHtml(query, signal);
+		setCached(query, response);
+		return { response, cached: false };
+	});
+
+	searchQueue = result.then(
+		() => {
+			activeOrQueuedSearches -= 1;
+		},
+		() => {
+			activeOrQueuedSearches -= 1;
+		},
+	);
+	return result;
 }
 
 function formatNetworkError(error: unknown): string {
@@ -235,16 +278,13 @@ export function registerTool(pi: ExtensionAPI): void {
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();
-			const cachedResponse = getCached(query);
-			const response = cachedResponse ?? (await fetchHtml(query, signal));
-			if (!cachedResponse) setCached(query, response);
-
+			const { response, cached } = await getSearchResponse(query, signal);
 			const results = response.results.slice(0, limit);
 			const details: Details = {
 				...response,
 				query,
 				limit,
-				cached: Boolean(cachedResponse),
+				cached,
 				elapsedMs: Date.now() - startedAt,
 				results,
 			};

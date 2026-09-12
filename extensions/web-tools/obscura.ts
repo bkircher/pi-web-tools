@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecOptions, ExecResult } from "@earendil-works/pi-coding-agent";
+import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "./fetch-types.js";
 import { scan, type ScanResult } from "./output.js";
 
@@ -42,7 +42,7 @@ export class ObscuraError extends Error {
 	}
 }
 
-export type Exec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
+export type Exec = ExtensionAPI["exec"];
 
 export type Storage = {
 	createWorkingDirectory(): Promise<string>;

@@ -8,9 +8,9 @@ type EvaluationData = {
 	results: UntrustedResult[];
 };
 
-export type RunObscura = (request: Request, options: ExecuteOptions) => Promise<Execution>;
+export type RunObscura = typeof execute;
 
-const SEARCH_HOSTNAME = "html.duckduckgo.com";
+const SEARCH_HOSTNAME = buildSearchUrl("").hostname;
 const SEARCH_TIMEOUT_SECONDS = 10;
 
 const SEARCH_EVALUATION_SCRIPT = `(() => {

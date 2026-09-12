@@ -1,12 +1,6 @@
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import { execute, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
-import type { ResponseData } from "./search-types.js";
-
-export type RawResult = {
-	title: unknown;
-	href: unknown;
-	snippet?: unknown;
-};
+import type { RawResult, ResponseData } from "./search-types.js";
 
 type EvaluationData = {
 	pageUrl: string;

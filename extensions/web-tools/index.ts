@@ -5,9 +5,8 @@ import { registerTool as registerSearchTool } from "./search.js";
 export { registerFetchTool, registerSearchTool };
 
 /** Details returned by the `web_search` tool. */
-export type { Result as SearchResult } from "./duckduckgo.js";
 export type { SearchParameters } from "./search.js";
-export type { Details as SearchDetails } from "./search-types.js";
+export type { Details as SearchDetails, Result as SearchResult } from "./search-types.js";
 
 /** Details returned by the `web_fetch` tool. */
 export type { FetchParameters } from "./fetch.js";

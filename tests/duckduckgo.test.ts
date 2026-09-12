@@ -56,13 +56,12 @@ test("stops collecting results at the requested limit", () => {
 	]);
 });
 
-test("omits duplicate, unsafe, and invalid results", () => {
+test("omits duplicate, unsafe, and empty results", () => {
 	const rawResults = [
 		{ title: "First", href: "https://example.com/" },
 		{ title: "Duplicate", href: "https://example.com/" },
 		{ title: "Script", href: "javascript:alert(1)" },
 		{ title: "Mail", href: "mailto:test@example.com" },
-		{ title: 42, href: "https://number.example/" },
 		{ title: "Empty link", href: "  " },
 		{ title: "", href: "https://empty.example/" },
 	];

@@ -1,9 +1,9 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import { MAX_RESULTS, type Result } from "./duckduckgo.js";
+import { MAX_RESULTS } from "./duckduckgo.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
 import { searchDuckDuckGo, type RunObscura } from "./search-obscura.js";
-import type { Details, ResponseData } from "./search-types.js";
+import type { Details, ResponseData, Result } from "./search-types.js";
 
 type CacheEntry = {
 	expiresAt: number;

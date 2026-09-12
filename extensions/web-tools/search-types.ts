@@ -1,4 +1,14 @@
-import type { Result } from "./duckduckgo.js";
+export type RawResult = {
+	title: string;
+	href: string;
+	snippet?: string;
+};
+
+export type Result = {
+	title: string;
+	url: string;
+	snippet?: string;
+};
 
 export type ResponseData = {
 	backend: "obscura";

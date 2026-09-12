@@ -1,10 +1,4 @@
-import type { RawResult } from "./search-obscura.js";
-
-export type Result = {
-	title: string;
-	url: string;
-	snippet?: string;
-};
+import type { RawResult, Result } from "./search-types.js";
 
 const DUCKDUCKGO_ORIGIN = "https://html.duckduckgo.com";
 const SEARCH_URL = `${DUCKDUCKGO_ORIGIN}/html/`;
@@ -61,13 +55,11 @@ export function normalizeResults(rawResults: RawResult[], maxResults: number): R
 	const seen = new Set<string>();
 
 	for (const rawResult of rawResults) {
-		if (typeof rawResult.title !== "string" || typeof rawResult.href !== "string") continue;
-
 		const title = normalizeWhitespace(rawResult.title);
 		const url = normalizeResultUrl(rawResult.href);
 		if (!title || !url || seen.has(url)) continue;
 
-		const snippet = typeof rawResult.snippet === "string" ? normalizeWhitespace(rawResult.snippet) : undefined;
+		const snippet = rawResult.snippet === undefined ? undefined : normalizeWhitespace(rawResult.snippet);
 		seen.add(url);
 		results.push({
 			title,

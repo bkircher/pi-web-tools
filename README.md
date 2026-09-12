@@ -89,9 +89,8 @@ Parameters:
 
 Output limits:
 
- -  Page content and Obscura diagnostics returned to the model are limited
-    together to pi's standard limit: 2000 lines or 50.0 KB, whichever comes
-    first.
+ -  The combined page content and Obscura diagnostics are limited to pi's
+    standard output limit: 2000 lines or 50.0 KB, whichever comes first.
  -  If page content is truncated, the full page output is left in a per-user
     temporary file and the path is included in the tool result. Truncated
     diagnostics are not retained.
@@ -99,18 +98,6 @@ Output limits:
     bounded preview returned to the model is retained in memory.
 
 [`obscura`]: https://github.com/h4ckf0r0day/obscura
-
-
-Usage guidance
---------------
-
- -  Use `web_search` to find candidate URLs.
- -  Use `web_fetch` when the URL is already known or after selecting a search
-    result.
- -  Use `dump=markdown` for most reading or summarization tasks.
- -  Use `dump=html` only when markup matters.
- -  Use `dump=links` for page link extraction.
- -  Use `dump=assets` for rendered subresource URLs.
 
 
 Known issues
@@ -123,16 +110,17 @@ exfiltration.
  -  Host checks are a preflight step only; redirects or later DNS changes can
     still cause Obscura to connect to a different address. Redirect targets
     should be checked separately.
- -  Reserved-name and IP-range coverage is not exhaustive; some special-use
-    hostnames and reserved addresses may not be rejected. Complete coverage is
-    difficult to guarantee.
+ -  Special-use hostname and reserved IP-range coverage is not exhaustive;
+    some special-use hostnames and reserved addresses may not be rejected.
+    Complete coverage is difficult to guarantee.
  -  Sensitive URL detection is heuristic. Query and fragment data is inspected
     through at most two URL-form decoding passes; token-like values hidden more
     deeply inside nested URLs may be missed. Complete detection is difficult to
     guarantee.
 
-Run pi in `sandbox-exec(1)` with Little Snitch, or otherwise isolate it from
-private data and infrastructure, to reduce the risk of exfiltration attacks.
+Run pi under `sandbox-exec(1)` and use Little Snitch, or otherwise isolate it
+from private data and infrastructure, to reduce the risk of exfiltration
+attacks.
 
 
 Links

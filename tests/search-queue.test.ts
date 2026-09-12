@@ -39,57 +39,81 @@ function getSearchTool(runObscura: RunObscura): SearchTool {
 	return tool;
 }
 
-async function createExecution(): Promise<Execution> {
+async function createExecution(title = "Example", href = "https://example.com/"): Promise<Execution> {
 	const text = JSON.stringify({
 		pageUrl: "https://html.duckduckgo.com/html/?q=example",
 		challenge: false,
-		results: [{ title: "Example", href: "https://example.com/" }],
+		results: [{ title, href }],
 	});
 	const scan = await scanOutput([Buffer.from(text)]);
 	return { output: { retention: "discard", scan } };
 }
 
-test("web_search serializes parallel requests and spaces their start times", async (context) => {
+test("web_search keeps cache state within each registration", async () => {
+	const firstExecution = await createExecution("First registration", "https://example.com/first");
+	const secondExecution = await createExecution("Second registration", "https://example.com/second");
+	let firstCalls = 0;
+	let secondCalls = 0;
+	const firstTool = getSearchTool(async () => {
+		firstCalls += 1;
+		return firstExecution;
+	});
+	const secondTool = getSearchTool(async () => {
+		secondCalls += 1;
+		return secondExecution;
+	});
+	const query = { query: "registration cache isolation query" };
+
+	const first = await firstTool.execute("first", query, undefined, undefined, toolContext);
+	const second = await secondTool.execute("second", query, undefined, undefined, toolContext);
+	const firstCached = await firstTool.execute("first-cached", query, undefined, undefined, toolContext);
+	const secondCached = await secondTool.execute("second-cached", query, undefined, undefined, toolContext);
+
+	assert.equal(firstCalls, 1);
+	assert.equal(secondCalls, 1);
+	assert.equal(first.details?.cached, false);
+	assert.equal(second.details?.cached, false);
+	assert.equal(firstCached.details?.cached, true);
+	assert.equal(secondCached.details?.cached, true);
+	assert.equal(first.details?.results[0]?.title, "First registration");
+	assert.equal(second.details?.results[0]?.title, "Second registration");
+	assert.equal(firstCached.details?.results[0]?.title, "First registration");
+	assert.equal(secondCached.details?.results[0]?.title, "Second registration");
+});
+
+test("web_search serializes registrations and spaces their start times", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
 	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
 	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
-	const executions = [firstExecution, Promise.resolve(execution)];
-	let calls = 0;
-	const runObscura: RunObscura = async () => {
+	let firstCalls = 0;
+	let secondCalls = 0;
+	const firstTool = getSearchTool(async () => {
+		firstCalls += 1;
 		markFirstStarted();
-		const nextExecution = executions[calls];
-		calls += 1;
-		return nextExecution!;
-	};
-	const tool = getSearchTool(runObscura);
+		return firstExecution;
+	});
+	const secondTool = getSearchTool(async () => {
+		secondCalls += 1;
+		return execution;
+	});
+	const query = { query: "parallel registration query" };
 
-	const firstResult = tool.execute(
-		"first",
-		{ query: "first parallel Obscura query" },
-		undefined,
-		undefined,
-		toolContext,
-	);
-	const secondResult = tool.execute(
-		"second",
-		{ query: "second parallel Obscura query" },
-		undefined,
-		undefined,
-		toolContext,
-	);
+	const firstResult = firstTool.execute("first", query, undefined, undefined, toolContext);
+	const secondResult = secondTool.execute("second", query, undefined, undefined, toolContext);
 	await firstStarted;
 
-	assert.equal(calls, 1);
+	assert.equal(firstCalls, 1);
+	assert.equal(secondCalls, 0);
 	completeFirst(execution);
 	await firstResult;
 	await Promise.resolve();
 	context.mock.timers.tick(999);
 	await Promise.resolve();
-	assert.equal(calls, 1);
+	assert.equal(secondCalls, 0);
 	context.mock.timers.tick(1);
 	await secondResult;
-	assert.equal(calls, 2);
+	assert.equal(secondCalls, 1);
 });
 
 test("web_search reuses a queued response from the cache", async (context) => {

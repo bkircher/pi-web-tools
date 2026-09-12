@@ -10,6 +10,8 @@ type CacheEntry = {
 	response: ResponseData;
 };
 
+type SearchCache = Map<string, CacheEntry>;
+
 type CachedResponse = {
 	response: ResponseData;
 	cached: boolean;
@@ -24,7 +26,6 @@ const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
 const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
-const cache = new Map<string, CacheEntry>();
 let searchQueue: Promise<void> = Promise.resolve();
 let activeOrQueuedSearches = 0;
 let lastSearchStartedAt = 0;
@@ -50,7 +51,7 @@ function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function getCached(query: string): ResponseData | undefined {
+function getCached(cache: SearchCache, query: string): ResponseData | undefined {
 	const key = cacheKey(query);
 	const entry = cache.get(key);
 	if (!entry) return undefined;
@@ -65,7 +66,7 @@ function getCached(query: string): ResponseData | undefined {
 	return entry.response;
 }
 
-function setCached(query: string, response: ResponseData): void {
+function setCached(cache: SearchCache, query: string, response: ResponseData): void {
 	cache.set(cacheKey(query), {
 		expiresAt: Date.now() + CACHE_TTL_MS,
 		response,
@@ -79,11 +80,12 @@ function setCached(query: string, response: ResponseData): void {
 }
 
 function getSearchResponse(
+	cache: SearchCache,
 	query: string,
 	signal: AbortSignal | undefined,
 	load: () => Promise<ResponseData>,
 ): Promise<CachedResponse> {
-	const cachedResponse = getCached(query);
+	const cachedResponse = getCached(cache, query);
 	if (cachedResponse) return Promise.resolve({ response: cachedResponse, cached: true });
 
 	const mustWaitForInterval = activeOrQueuedSearches > 0;
@@ -92,7 +94,7 @@ function getSearchResponse(
 	const result = searchQueue.then(async () => {
 		if (signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
 
-		const queuedResponse = getCached(query);
+		const queuedResponse = getCached(cache, query);
 		if (queuedResponse) return { response: queuedResponse, cached: true };
 
 		if (mustWaitForInterval) {
@@ -103,7 +105,7 @@ function getSearchResponse(
 
 		lastSearchStartedAt = Date.now();
 		const response = await load();
-		setCached(query, response);
+		setCached(cache, query, response);
 		return { response, cached: false };
 	});
 
@@ -132,6 +134,8 @@ function formatResults(results: Result[]): string {
  * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
 export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
+	const cache: SearchCache = new Map();
+
 	pi.registerTool({
 		name: "web_search",
 		label: "Web Search",
@@ -150,7 +154,7 @@ export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}):
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();
-			const { response, cached } = await getSearchResponse(query, signal, () =>
+			const { response, cached } = await getSearchResponse(cache, query, signal, () =>
 				searchDuckDuckGo(query, {
 					exec: (command, args, executeOptions) => pi.exec(command, args, executeOptions),
 					cwd: ctx.cwd,

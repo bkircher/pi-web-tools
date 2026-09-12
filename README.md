@@ -1,20 +1,22 @@
 pi-web-tools
 ============
 
-A pi extension that adds two tools to the
-[pi] coding agent: `web_search`, which
-searches DuckDuckGo, and `web_fetch`, which fetches pages. Both tools use the
-[Obscura] headless browser. The
-`obscura` CLI must be installed and available on `PATH`.
+Adds two tools to the [pi] coding agent:
+
+ -  `web_search`, which searches DuckDuckGo, and
+ -  `web_fetch`, which fetches pages.
+
+Both tools use the excellent [Obscura headless browser]. The `obscura` CLI must
+be installed and available on `PATH`.
 
 [pi]: https://github.com/earendil-works/pi
-[Obscura]: https://github.com/h4ckf0r0day/obscura
+[Obscura headless browser]: https://github.com/h4ckf0r0day/obscura
 
 
 Tools
 -----
 
-### `web_search`
+### web\_search
 
 Opens DuckDuckGo's HTML search (`https://html.duckduckgo.com/html/?q=example`)
 through Obscura and returns result titles, URLs, and snippets.
@@ -34,7 +36,7 @@ DuckDuckGo anti-bot detection), and queued searches start at least one second
 apart. A detected anti-bot challenge fails the search. A failed search is not
 retried, and the tool does not fall back to a Node.js or another backend.
 
-### `web_fetch`
+### web\_fetch
 
 Fetches a specific URL with the
 [`obscura`] CLI.

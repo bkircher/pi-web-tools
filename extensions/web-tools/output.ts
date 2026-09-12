@@ -55,7 +55,7 @@ export async function scan(
 	const totalLines = totalBytes === 0 ? 0 : newlineCount + (endsWithNewline ? 0 : 1);
 	const prefixTruncation = truncateHead(text, { maxBytes, maxLines });
 	const truncated = prefixTruncation.truncated || retainedBytes < totalBytes;
-	const truncatedBy = prefixTruncation.truncatedBy ?? (truncated ? (totalBytes > maxBytes ? "bytes" : "lines") : null);
+	const truncatedBy = prefixTruncation.truncatedBy ?? (truncated ? "bytes" : null);
 
 	return {
 		text,

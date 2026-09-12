@@ -3,6 +3,7 @@ import test from "node:test";
 import {
 	buildArgs as buildObscuraArgs,
 	execute as executeObscuraFetch,
+	type Exec as ObscuraExec,
 	type OutputSource as ObscuraOutputSource,
 	type Request as ObscuraRequest,
 	type Storage as ObscuraStorage,
@@ -168,7 +169,8 @@ test("limits diagnostic output from a failed Obscura command", async () => {
 	});
 });
 
-test("reports a killed Obscura process as a typed timeout", async () => {
+test("reports the process deadline when Pi kills Obscura", async () => {
+	let processTimeoutMs: number | undefined;
 	const storage: ObscuraStorage = {
 		createWorkingDirectory: async () => "/work",
 		readOutputFile: async () => {
@@ -177,14 +179,40 @@ test("reports a killed Obscura process as a typed timeout", async () => {
 		retainOutput: async () => "/retained/output.txt",
 		removeWorkingDirectory: async () => {},
 	};
-	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
+	const exec: ObscuraExec = async (_command, _args, options) => {
+		processTimeoutMs = options?.timeout;
+		return { stdout: "", stderr: "", code: 1, killed: true };
+	};
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
 	await assert.rejects(result, {
 		name: "ObscuraError",
 		code: "timeout",
-		message: "obscura fetch timed out",
+		message: "obscura fetch process timed out after 45 seconds",
+		processTimeoutSeconds: 45,
+	});
+	assert.equal(processTimeoutMs, 45_000);
+});
+
+test("reports Obscura exit code 124 as a process timeout", async () => {
+	const storage: ObscuraStorage = {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw new Error("not used");
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => {},
+	};
+	const exec = async () => ({ stdout: "", stderr: "hard timeout", code: 124, killed: false });
+
+	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
+
+	await assert.rejects(result, {
+		name: "ObscuraError",
+		code: "timeout",
+		message: "obscura fetch process timed out after 45 seconds",
+		processTimeoutSeconds: 45,
 	});
 });
 

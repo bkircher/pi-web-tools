@@ -42,6 +42,7 @@ export class ObscuraError extends Error {
 	constructor(
 		public readonly code: ObscuraErrorCode,
 		message: string,
+		public readonly processTimeoutSeconds?: number,
 	) {
 		super(message);
 		this.name = "ObscuraError";
@@ -137,17 +138,37 @@ async function prepareOutput(source: OutputSource, storage: Storage): Promise<Pr
 }
 
 const DIAGNOSTIC_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
+const OBSCURA_TIMEOUT_EXIT_CODE = 124;
+const PROCESS_TIMEOUT_GRACE_SECONDS = 10;
+
+export function calculateProcessTimeoutSeconds(
+	navigationTimeoutSeconds: number,
+	postNavigationWaitSeconds: number,
+): number {
+	return navigationTimeoutSeconds + postNavigationWaitSeconds + PROCESS_TIMEOUT_GRACE_SECONDS;
+}
 
 function limitDiagnostic(content: string, source: string) {
 	return limitText(content, `[${source} truncated: ${DIAGNOSTIC_LIMIT} limit reached.]`);
 }
 
-function assertSucceeded(result: ExecResult, signal?: AbortSignal): void {
+function createProcessTimeoutError(processTimeoutSeconds: number): ObscuraError {
+	return new ObscuraError(
+		"timeout",
+		`obscura fetch process timed out after ${processTimeoutSeconds} seconds`,
+		processTimeoutSeconds,
+	);
+}
+
+function assertSucceeded(result: ExecResult, processTimeoutSeconds: number, signal?: AbortSignal): void {
 	if (result.killed) {
 		if (signal?.aborted) {
 			throw new ObscuraError("cancelled", "obscura fetch was cancelled");
 		}
-		throw new ObscuraError("timeout", "obscura fetch timed out");
+		throw createProcessTimeoutError(processTimeoutSeconds);
+	}
+	if (result.code === OBSCURA_TIMEOUT_EXIT_CODE) {
+		throw createProcessTimeoutError(processTimeoutSeconds);
 	}
 	if (result.code !== 0) {
 		const stderr = result.stderr.trim();
@@ -164,13 +185,13 @@ export async function execute(request: Request, options: ExecuteOptions): Promis
 	const outputPath = join(workingDirectory, "output.txt");
 
 	try {
-		const processTimeoutMs = (request.timeout + request.wait + 10) * 1000;
+		const processTimeoutSeconds = calculateProcessTimeoutSeconds(request.timeout, request.wait);
 		const result = await options.exec("obscura", buildArgs(request, outputPath), {
 			cwd: options.cwd,
 			signal: options.signal,
-			timeout: processTimeoutMs,
+			timeout: processTimeoutSeconds * 1000,
 		});
-		assertSucceeded(result, options.signal);
+		assertSucceeded(result, processTimeoutSeconds, options.signal);
 
 		const source = await getOutputSource(storage, outputPath, result.stdout);
 		const output = await prepareOutput(source, storage);

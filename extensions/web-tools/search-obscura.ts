@@ -1,6 +1,13 @@
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
-import { execute, ObscuraError, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
+import {
+	calculateProcessTimeoutSeconds,
+	execute,
+	ObscuraError,
+	type ExecuteOptions,
+	type Execution,
+	type Request,
+} from "./obscura.js";
 import { limitText } from "./output.js";
 import type { ResponseData, UntrustedResult } from "./search-types.js";
 
@@ -13,7 +20,7 @@ type EvaluationData = {
 export type RunObscura = typeof execute;
 
 const SEARCH_HOSTNAME = buildSearchUrl("").hostname;
-const SEARCH_TIMEOUT_SECONDS = 10;
+const SEARCH_NAVIGATION_TIMEOUT_SECONDS = 10;
 const OUTPUT_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
 const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} limit reached.]`;
 const FAILURE_TRUNCATION_NOTICE = `[DuckDuckGo search failure truncated: ${OUTPUT_LIMIT} limit reached.]`;
@@ -131,8 +138,9 @@ export async function searchDuckDuckGo(
 		url: searchUrl,
 		waitUntil: "domcontentloaded",
 		wait: 0,
-		timeout: SEARCH_TIMEOUT_SECONDS,
+		timeout: SEARCH_NAVIGATION_TIMEOUT_SECONDS,
 	};
+	const processTimeoutSeconds = calculateProcessTimeoutSeconds(request.timeout, request.wait);
 	let execution: Execution;
 
 	try {
@@ -146,7 +154,8 @@ export async function searchDuckDuckGo(
 			throw new Error("DuckDuckGo search was cancelled", { cause: error });
 		}
 		if (error instanceof ObscuraError && error.code === "timeout") {
-			throw new Error(`DuckDuckGo search timed out after ${SEARCH_TIMEOUT_SECONDS} seconds`, { cause: error });
+			const timeoutSeconds = error.processTimeoutSeconds ?? processTimeoutSeconds;
+			throw new Error(`DuckDuckGo search timed out after ${timeoutSeconds} seconds`, { cause: error });
 		}
 		const failure = limitText(
 			`DuckDuckGo search failed through Obscura: ${errorReason(error)}`,

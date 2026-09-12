@@ -168,7 +168,7 @@ test("rejects invalid structured result fields", async () => {
 	});
 });
 
-test("reports an Obscura timeout separately", async () => {
+test("reports the search process timeout separately from the navigation timeout", async () => {
 	const runObscura: RunObscura = async () => {
 		throw new ObscuraError("timeout", "obscura fetch timed out");
 	};
@@ -179,7 +179,7 @@ test("reports an Obscura timeout separately", async () => {
 		runObscura,
 	});
 
-	await assert.rejects(result, { message: "DuckDuckGo search timed out after 10 seconds" });
+	await assert.rejects(result, { message: "DuckDuckGo search timed out after 20 seconds" });
 });
 
 test("does not infer a timeout from command failure text", async () => {

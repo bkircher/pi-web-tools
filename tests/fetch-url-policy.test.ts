@@ -125,6 +125,34 @@ test("rejects private IP literals", async () => {
 	await assert.rejects(result, { message: "web_fetch URL must not target private, local, or reserved IP addresses" });
 });
 
+const mappedIpv4BlockedRangeStarts = [
+	{ range: "0.0.0.0/8", input: "http://[::ffff:0.0.0.0]/" },
+	{ range: "10.0.0.0/8", input: "http://[::ffff:10.0.0.0]/" },
+	{ range: "100.64.0.0/10", input: "http://[::ffff:100.64.0.0]/" },
+	{ range: "127.0.0.0/8", input: "http://[::ffff:127.0.0.0]/" },
+	{ range: "169.254.0.0/16", input: "http://[::ffff:169.254.0.0]/" },
+	{ range: "172.16.0.0/12", input: "http://[::ffff:172.16.0.0]/" },
+	{ range: "192.0.0.0/24", input: "http://[::ffff:192.0.0.0]/" },
+	{ range: "192.0.2.0/24", input: "http://[::ffff:192.0.2.0]/" },
+	{ range: "192.88.99.0/24", input: "http://[::ffff:192.88.99.0]/" },
+	{ range: "192.168.0.0/16", input: "http://[::ffff:192.168.0.0]/" },
+	{ range: "198.18.0.0/15", input: "http://[::ffff:198.18.0.0]/" },
+	{ range: "198.51.100.0/24", input: "http://[::ffff:198.51.100.0]/" },
+	{ range: "203.0.113.0/24", input: "http://[::ffff:203.0.113.0]/" },
+	{ range: "224.0.0.0/4", input: "http://[::ffff:224.0.0.0]/" },
+	{ range: "240.0.0.0/4", input: "http://[::ffff:240.0.0.0]/" },
+] as const;
+
+for (const { range, input } of mappedIpv4BlockedRangeStarts) {
+	test(`rejects IPv4-mapped IPv6 literals at the start of ${range}`, async () => {
+		const result = normalizeUrl(input, resolvePublicHost);
+
+		await assert.rejects(result, {
+			message: "web_fetch URL must not target private, local, or reserved IP addresses",
+		});
+	});
+}
+
 test("rejects hostnames when any resolved address is private", async () => {
 	const resolveMixedHost: Resolver = async () => [{ address: "93.184.216.34" }, { address: "10.0.0.1" }];
 

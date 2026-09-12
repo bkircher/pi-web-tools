@@ -68,34 +68,10 @@ function getIpVersion(address: string): IpVersion | undefined {
 	return undefined;
 }
 
-function getMappedIpv4(address: string): string | undefined {
-	const normalized = stripBrackets(address);
-	if (isIP(normalized) !== 6) return undefined;
-
-	let canonical: string;
-	try {
-		canonical = stripBrackets(new URL(`http://[${normalized}]/`).hostname).toLowerCase();
-	} catch {
-		canonical = normalized.toLowerCase();
-	}
-
-	const match = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(canonical);
-	if (!match) return undefined;
-
-	const high = Number.parseInt(match[1], 16);
-	const low = Number.parseInt(match[2], 16);
-	return `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`;
-}
-
 function isBlockedIp(address: string): boolean {
 	const normalized = stripBrackets(address);
 	const version = getIpVersion(normalized);
 	if (version === undefined) return false;
-
-	if (version === "ipv6") {
-		const mappedIpv4 = getMappedIpv4(normalized);
-		if (mappedIpv4 && BLOCKED_IPS.check(mappedIpv4, "ipv4")) return true;
-	}
 
 	return BLOCKED_IPS.check(normalized, version);
 }

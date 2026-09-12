@@ -119,9 +119,9 @@ exfiltration.
  -  Host checks are a preflight step only; redirects or later DNS changes can
     still cause Obscura to connect to a different address. Redirect targets
     should be checked separately.
- -  Reserved-name coverage is not exhaustive; some special-use hostnames and
-    IPv4-mapped IPv6 addresses in reserved ranges may not be rejected. Complete
-    coverage is difficult to guarantee.
+ -  Reserved-name and IP-range coverage is not exhaustive; some special-use
+    hostnames and reserved addresses may not be rejected. Complete coverage is
+    difficult to guarantee.
  -  Sensitive URL detection is heuristic. Query and fragment data is inspected
     through at most two URL-form decoding passes; token-like values hidden more
     deeply inside nested URLs may be missed. Complete detection is difficult to

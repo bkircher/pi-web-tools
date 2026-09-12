@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -16,10 +16,6 @@ type RequestBase = {
 
 export type Request = RequestBase &
 	({ mode: "dump"; dump: DumpMode; selector?: string } | { mode: "eval"; script: string });
-
-export type OutputSource =
-	| { source: "file"; path: string; scan: ScanResult }
-	| { source: "stdout"; content: string; scan: ScanResult };
 
 type PreparedOutput =
 	| { retention: "discard"; scan: ScanResult }
@@ -47,7 +43,7 @@ export type Exec = ExtensionAPI["exec"];
 export type Storage = {
 	createWorkingDirectory(): Promise<string>;
 	readOutputFile(path: string): Promise<ScanResult>;
-	retainOutput(source: OutputSource): Promise<string>;
+	retainOutput(path: string): Promise<string>;
 	removeWorkingDirectory(path: string): Promise<void>;
 };
 
@@ -62,16 +58,12 @@ function createTempDir(prefix: string): Promise<string> {
 	return mkdtemp(join(tmpdir(), prefix));
 }
 
-async function retainOutput(source: OutputSource): Promise<string> {
+async function retainOutput(path: string): Promise<string> {
 	const retainedDirectory = await createTempDir("pi-web-fetch-output-");
 	const retainedPath = join(retainedDirectory, "output.txt");
 
 	try {
-		if (source.source === "file") {
-			await rename(source.path, retainedPath);
-		} else {
-			await writeFile(retainedPath, source.content, "utf8");
-		}
+		await rename(path, retainedPath);
 		return retainedPath;
 	} catch (error) {
 		await rm(retainedDirectory, { recursive: true, force: true }).catch(() => {});
@@ -102,31 +94,13 @@ export function buildArgs(request: Request, outputPath: string): string[] {
 	return args;
 }
 
-function isFileNotFoundError(error: unknown): boolean {
-	return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
-}
-
-async function getOutputSource(storage: Storage, outputPath: string, stdout: string): Promise<OutputSource> {
-	try {
-		return { source: "file", path: outputPath, scan: await storage.readOutputFile(outputPath) };
-	} catch (error) {
-		if (!isFileNotFoundError(error)) throw error;
-		if (!stdout) throw new Error(`obscura fetch produced no readable output at ${outputPath}`);
-		return {
-			source: "stdout",
-			content: stdout,
-			scan: await scan([Buffer.from(stdout)]),
-		};
-	}
-}
-
-async function prepareOutput(source: OutputSource, storage: Storage): Promise<PreparedOutput> {
-	if (!source.scan.truncation.truncated) return { retention: "discard", scan: source.scan };
+async function prepareOutput(scan: ScanResult, outputPath: string, storage: Storage): Promise<PreparedOutput> {
+	if (!scan.truncation.truncated) return { retention: "discard", scan };
 
 	return {
 		retention: "retain",
-		scan: source.scan,
-		fullOutputPath: await storage.retainOutput(source),
+		scan,
+		fullOutputPath: await storage.retainOutput(outputPath),
 	};
 }
 
@@ -161,8 +135,8 @@ export async function execute(request: Request, options: ExecuteOptions): Promis
 		});
 		assertSucceeded(result, options.signal);
 
-		const source = await getOutputSource(storage, outputPath, result.stdout);
-		const output = await prepareOutput(source, storage);
+		const scan = await storage.readOutputFile(outputPath);
+		const output = await prepareOutput(scan, outputPath, storage);
 		const stderr = result.stderr.trim();
 		return {
 			output,

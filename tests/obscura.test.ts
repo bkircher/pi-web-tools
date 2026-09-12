@@ -3,10 +3,10 @@ import test from "node:test";
 import {
 	buildArgs as buildObscuraArgs,
 	execute as executeObscuraFetch,
-	type OutputSource as ObscuraOutputSource,
 	type Request as ObscuraRequest,
 	type Storage as ObscuraStorage,
 } from "../extensions/web-tools/obscura.ts";
+import { scan as scanOutput } from "../extensions/web-tools/output.ts";
 
 const dumpRequest: ObscuraRequest = {
 	mode: "dump",
@@ -88,41 +88,39 @@ test("builds Obscura eval arguments without dump-only options", () => {
 	]);
 });
 
-test("persists truncated stdout fallback output before deleting the working directory", async () => {
-	const stdout = "a".repeat(51_201);
-	let retainedSource: ObscuraOutputSource["source"] | undefined;
+test("retains a truncated output file before deleting the working directory", async () => {
+	const scan = await scanOutput([Buffer.from("a".repeat(51_201))]);
+	let retainedOutputPath: string | undefined;
 	let removedWorkingDirectory: string | undefined;
 	const storage = createStorage({
-		readOutputFile: async () => {
-			throw Object.assign(new Error("missing output file"), { code: "ENOENT" });
-		},
-		retainOutput: async (source) => {
-			retainedSource = source.source;
+		readOutputFile: async () => scan,
+		retainOutput: async (path) => {
+			retainedOutputPath = path;
 			return "/retained/output.txt";
 		},
 		removeWorkingDirectory: async (path) => {
 			removedWorkingDirectory = path;
 		},
 	});
-	const exec = async () => ({ stdout, stderr: "", code: 0, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
 
 	const result = await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
 	assert.ok(result.output.retention === "retain");
 	assert.equal(result.output.scan.bytes, 51_201);
 	assert.equal(result.output.fullOutputPath, "/retained/output.txt");
-	assert.equal(retainedSource, "stdout");
+	assert.equal(retainedOutputPath, "/work/output.txt");
 	assert.equal(removedWorkingDirectory, "/work");
 });
 
-test("propagates output file read errors instead of falling back to stdout", async () => {
+test("propagates output file read errors", async () => {
 	const readError = Object.assign(new Error("permission denied"), { code: "EACCES" });
 	const storage = createStorage({
 		readOutputFile: async () => {
 			throw readError;
 		},
 	});
-	const exec = async () => ({ stdout: "fallback output", stderr: "", code: 0, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 

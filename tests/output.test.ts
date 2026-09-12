@@ -8,9 +8,9 @@ test("returns empty output metadata", async () => {
 	const result = await scanOutput(chunks);
 
 	assert.equal(result.text, "");
-	assert.equal(result.bytes, 0);
+	assert.equal(result.truncation.totalBytes, 0);
 	assert.equal(result.truncation.totalLines, 0);
-	assert.equal(result.truncation.truncated, false);
+	assert.equal(result.truncated, false);
 });
 
 test("returns output below both limits unchanged", async () => {
@@ -19,10 +19,10 @@ test("returns output below both limits unchanged", async () => {
 	const result = await scanOutput(chunks);
 
 	assert.equal(result.text, "alpha\nbeta\n");
-	assert.equal(result.bytes, 11);
+	assert.equal(result.truncation.totalBytes, 11);
 	assert.equal(result.truncation.content, "alpha\nbeta\n");
 	assert.equal(result.truncation.totalLines, 2);
-	assert.equal(result.truncation.truncated, false);
+	assert.equal(result.truncated, false);
 });
 
 test("truncates output at the line limit", async () => {
@@ -52,7 +52,7 @@ test("identifies a multibyte first line that exceeds the byte limit", async () =
 
 	const result = await scanOutput(chunks, { maxBytes: 5, maxLines: 10 });
 
-	assert.equal(result.bytes, 6);
+	assert.equal(result.truncation.totalBytes, 6);
 	assert.equal(result.truncation.content, "");
 	assert.equal(result.truncation.firstLineExceedsLimit, true);
 	assert.equal(result.truncation.truncatedBy, "bytes");
@@ -73,7 +73,7 @@ test("counts CRLF lines without adding an empty trailing line", async () => {
 
 	const result = await scanOutput(chunks);
 
-	assert.equal(result.bytes, 6);
+	assert.equal(result.truncation.totalBytes, 6);
 	assert.equal(result.truncation.totalLines, 2);
 	assert.equal(result.truncation.content, "a\r\nb\r\n");
 });
@@ -83,7 +83,7 @@ test("counts the final line when output has no trailing newline", async () => {
 
 	const result = await scanOutput(chunks);
 
-	assert.equal(result.bytes, 3);
+	assert.equal(result.truncation.totalBytes, 3);
 	assert.equal(result.truncation.totalLines, 2);
 	assert.equal(result.truncation.content, "a\nb");
 });
@@ -93,7 +93,7 @@ test("keeps a bounded preview for output larger than ten MiB", async () => {
 
 	const result = await scanOutput(chunks);
 
-	assert.equal(result.bytes, 10_485_761);
+	assert.equal(result.truncation.totalBytes, 10_485_761);
 	assert.equal(result.text.length, 51_204);
 	assert.equal(result.truncation.totalLines, 1);
 	assert.equal(result.truncation.firstLineExceedsLimit, true);

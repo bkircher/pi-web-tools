@@ -10,7 +10,7 @@ import {
 	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "./fetch-types.js";
-import { limitText, scan, type ScanResult } from "./output.js";
+import { limitText, scan, type CompleteScanResult, type ScanResult, type TruncatedScanResult } from "./output.js";
 
 type RequestBase = {
 	url: string;
@@ -28,8 +28,8 @@ export type OutputSource =
 	| { source: "stdout"; content: string; scan: ScanResult };
 
 type PreparedOutput =
-	| { retention: "discard"; scan: ScanResult }
-	| { retention: "retain"; scan: ScanResult; fullOutputPath: string };
+	| (CompleteScanResult & { fullOutputPath?: never })
+	| (TruncatedScanResult & { fullOutputPath: string });
 
 export type Execution = {
 	output: PreparedOutput;
@@ -128,11 +128,10 @@ async function getOutputSource(storage: Storage, outputPath: string, stdout: str
 }
 
 async function prepareOutput(source: OutputSource, storage: Storage): Promise<PreparedOutput> {
-	if (!source.scan.truncation.truncated) return { retention: "discard", scan: source.scan };
+	if (!source.scan.truncated) return source.scan;
 
 	return {
-		retention: "retain",
-		scan: source.scan,
+		...source.scan,
 		fullOutputPath: await storage.retainOutput(source),
 	};
 }

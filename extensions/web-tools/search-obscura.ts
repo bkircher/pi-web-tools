@@ -53,13 +53,13 @@ function throwObscuraFailure(reason: string): never {
 }
 
 function parseEvaluation(execution: Execution): EvaluationData {
-	if (execution.output.retention === "retain" || execution.output.scan.truncation.truncated) {
+	if (execution.output.truncated) {
 		return throwObscuraFailure("Obscura returned truncated evaluation output");
 	}
 
 	let value: unknown;
 	try {
-		value = JSON.parse(execution.output.scan.text);
+		value = JSON.parse(execution.output.text);
 	} catch {
 		return throwObscuraFailure("Obscura returned invalid JSON");
 	}
@@ -176,7 +176,7 @@ export async function searchDuckDuckGo(
 	return {
 		backend: "obscura",
 		searchUrl,
-		bytes: execution.output.scan.bytes,
+		bytes: execution.output.truncation.totalBytes,
 		results: normalizeResults(evaluation.results, MAX_RESULTS),
 		...(stderr ? { stderr } : {}),
 	};

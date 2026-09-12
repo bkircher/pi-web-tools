@@ -31,12 +31,12 @@ const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} lim
 
 function formatOutput(execution: Execution, stderr: string | undefined): LimitedText {
 	const { output } = execution;
-	const { truncation } = output.scan;
+	const { truncation } = output;
 	let text = truncation.content;
 
-	if (output.retention === "retain") {
+	if (output.truncated) {
 		const firstLinePreview = truncation.firstLineExceedsLimit
-			? makePrefixPreview(output.scan.text, truncation.maxBytes)
+			? makePrefixPreview(output.text, truncation.maxBytes)
 			: undefined;
 		text = firstLinePreview?.content ?? text;
 
@@ -53,7 +53,7 @@ function formatOutput(execution: Execution, stderr: string | undefined): Limited
 	if (!text) text = "No content returned.";
 	if (stderr) text += `\n\n[Obscura stderr]\n${stderr}`;
 
-	const retainedOutput = output.retention === "retain" ? ` Full page output saved to: ${output.fullOutputPath}` : "";
+	const retainedOutput = output.truncated ? ` Full page output saved to: ${output.fullOutputPath}` : "";
 	return limitText(text, `[Tool output truncated: ${OUTPUT_LIMIT} limit reached.${retainedOutput}]`);
 }
 
@@ -63,8 +63,8 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 	const formattedOutput = formatOutput(execution, execution.stderr);
 	const effectiveTruncation: TruncationResult | undefined = formattedOutput.truncation.truncated
 		? formattedOutput.truncation
-		: output.retention === "retain"
-			? output.scan.truncation
+		: output.truncated
+			? { ...output.truncation, truncated: true }
 			: limitedStderr?.truncation.truncated
 				? limitedStderr.truncation
 				: undefined;
@@ -72,7 +72,7 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 		? {
 				truncated: true as const,
 				truncation: effectiveTruncation,
-				...(output.retention === "retain" ? { fullOutputPath: output.fullOutputPath } : {}),
+				...(output.truncated ? { fullOutputPath: output.fullOutputPath } : {}),
 			}
 		: { truncated: false as const };
 	const commonDetails = {
@@ -83,7 +83,7 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 		stealth: true as const,
 		proxy: Boolean(request.proxy),
 		elapsedMs,
-		bytes: output.scan.bytes,
+		bytes: output.truncation.totalBytes,
 		...outputDetails,
 		...(limitedStderr ? { stderr: limitedStderr.text } : {}),
 	};

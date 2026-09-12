@@ -16,8 +16,9 @@ const request: ObscuraRequest = {
 
 test("formats complete Obscura output without retention details", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
+	assert.equal(output.truncated, false);
 	const execution = {
-		output: { retention: "discard" as const, scan: output },
+		output,
 		stderr: "browser warning",
 	};
 
@@ -43,8 +44,9 @@ test("formats complete Obscura output without retention details", async () => {
 
 test("limits stderr as part of the returned tool output", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
+	assert.equal(output.truncated, false);
 	const execution = {
-		output: { retention: "discard" as const, scan: output },
+		output,
 		stderr: "a".repeat(100_000),
 	};
 
@@ -61,8 +63,9 @@ test("limits stderr as part of the returned tool output", async () => {
 
 test("limits stderr by the total tool output line count", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
+	assert.equal(output.truncated, false);
 	const execution = {
-		output: { retention: "discard" as const, scan: output },
+		output,
 		stderr: "warning\n".repeat(3_000),
 	};
 
@@ -77,10 +80,10 @@ test("limits stderr by the total tool output line count", async () => {
 
 test("formats truncated output with its retained file path", async () => {
 	const output = await scanOutput([Buffer.from("alpha\nbeta\n")], { maxBytes: 100, maxLines: 1 });
+	assert.equal(output.truncated, true);
 	const execution = {
 		output: {
-			retention: "retain" as const,
-			scan: output,
+			...output,
 			fullOutputPath: "/retained/output.txt",
 		},
 	};
@@ -99,10 +102,10 @@ test("formats truncated output with its retained file path", async () => {
 
 test("returns a UTF-8 prefix when the first line exceeds the byte limit", async () => {
 	const output = await scanOutput([Buffer.from("ééé")], { maxBytes: 5, maxLines: 10 });
+	assert.equal(output.truncated, true);
 	const execution = {
 		output: {
-			retention: "retain" as const,
-			scan: output,
+			...output,
 			fullOutputPath: "/retained/output.txt",
 		},
 	};

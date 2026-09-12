@@ -45,8 +45,9 @@ async function createExecution(title = "Example", href = "https://example.com/")
 		challenge: false,
 		results: [{ title, href }],
 	});
-	const scan = await scanOutput([Buffer.from(text)]);
-	return { output: { retention: "discard", scan } };
+	const output = await scanOutput([Buffer.from(text)]);
+	assert.equal(output.truncated, false);
+	return { output };
 }
 
 test("web_search keeps cache state within each registration", async () => {

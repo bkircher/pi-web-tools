@@ -99,8 +99,8 @@ test("persists truncated stdout fallback output before deleting the working dire
 
 	const result = await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
-	assert.ok(result.output.retention === "retain");
-	assert.equal(result.output.scan.bytes, 51_201);
+	assert.equal(result.output.truncated, true);
+	assert.equal(result.output.truncation.totalBytes, 51_201);
 	assert.equal(result.output.fullOutputPath, "/retained/output.txt");
 	assert.equal(retainedSource, "stdout");
 	assert.equal(removedWorkingDirectory, "/work");

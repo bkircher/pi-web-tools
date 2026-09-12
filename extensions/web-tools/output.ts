@@ -7,11 +7,14 @@ import {
 
 const MAX_UTF8_CODE_POINT_BYTES = 4;
 
-export type ScanResult = {
+type ScanResultBase = {
 	text: string;
-	bytes: number;
-	truncation: TruncationResult;
+	truncation: Omit<TruncationResult, "truncated">;
 };
+
+export type CompleteScanResult = ScanResultBase & { truncated: false };
+export type TruncatedScanResult = ScanResultBase & { truncated: true };
+export type ScanResult = CompleteScanResult | TruncatedScanResult;
 
 export type LimitedText = {
 	text: string;
@@ -118,15 +121,18 @@ export async function scan(
 	const truncated = prefixTruncation.truncated || retainedBytes < totalBytes;
 	const truncatedBy = prefixTruncation.truncatedBy ?? (truncated ? (totalBytes > maxBytes ? "bytes" : "lines") : null);
 
-	return {
-		text,
-		bytes: totalBytes,
-		truncation: {
-			...prefixTruncation,
-			truncated,
-			truncatedBy,
-			totalBytes,
-			totalLines,
-		},
+	const truncation = {
+		content: prefixTruncation.content,
+		truncatedBy,
+		totalLines,
+		totalBytes,
+		outputLines: prefixTruncation.outputLines,
+		outputBytes: prefixTruncation.outputBytes,
+		lastLinePartial: prefixTruncation.lastLinePartial,
+		firstLineExceedsLimit: prefixTruncation.firstLineExceedsLimit,
+		maxLines: prefixTruncation.maxLines,
+		maxBytes: prefixTruncation.maxBytes,
 	};
+
+	return truncated ? { text, truncated: true, truncation } : { text, truncated: false, truncation };
 }

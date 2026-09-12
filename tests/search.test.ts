@@ -14,15 +14,17 @@ const validEvaluation = {
 
 async function createExecution(value: unknown, stderr?: string) {
 	const scan = await scanOutput([Buffer.from(JSON.stringify(value))]);
+	assert.equal(scan.truncated, false);
 	return {
-		output: { retention: "discard" as const, scan: { ...scan, bytes: 321 } },
+		output: { ...scan, truncation: { ...scan.truncation, totalBytes: 321 } },
 		...(stderr ? { stderr } : {}),
 	};
 }
 
 async function createTextExecution(text: string) {
-	const scan = await scanOutput([Buffer.from(text)]);
-	return { output: { retention: "discard" as const, scan } };
+	const output = await scanOutput([Buffer.from(text)]);
+	assert.equal(output.truncated, false);
+	return { output };
 }
 
 test("searches with a fixed Obscura evaluation and normalizes results", async () => {
@@ -119,8 +121,9 @@ test("rejects malformed Obscura output", async () => {
 
 test("rejects truncated Obscura output", async () => {
 	const scan = await scanOutput([Buffer.from(JSON.stringify(validEvaluation))], { maxBytes: 10 });
+	assert.equal(scan.truncated, true);
 	const execution = {
-		output: { retention: "retain" as const, scan, fullOutputPath: "/retained/output.txt" },
+		output: { ...scan, fullOutputPath: "/retained/output.txt" },
 	};
 	const runObscura: RunObscura = async () => execution;
 

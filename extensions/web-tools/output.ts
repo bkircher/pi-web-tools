@@ -13,10 +13,71 @@ export type ScanResult = {
 	truncation: TruncationResult;
 };
 
+export type LimitedText = {
+	text: string;
+	truncation: TruncationResult;
+};
+
 type Limits = {
 	maxBytes?: number;
 	maxLines?: number;
 };
+
+function makePrefixPreview(content: string, maxBytes: number): string {
+	let bytes = 0;
+	let endIndex = 0;
+
+	for (const char of content) {
+		const charBytes = Buffer.byteLength(char, "utf8");
+		if (bytes + charBytes > maxBytes) break;
+		bytes += charBytes;
+		endIndex += char.length;
+	}
+
+	return content.slice(0, endIndex);
+}
+
+function countLines(content: string): number {
+	if (!content) return 0;
+	let lines = content.endsWith("\n") ? 0 : 1;
+	for (const char of content) {
+		if (char === "\n") lines += 1;
+	}
+	return lines;
+}
+
+/**
+ * Limits a complete text result, including its truncation notice.
+ */
+export function limitText(content: string, notice: string, limits: Limits = {}): LimitedText {
+	const truncation = truncateHead(content, limits);
+	if (!truncation.truncated) return { text: content, truncation };
+
+	const noticeBytes = Buffer.byteLength(notice, "utf8");
+	const noticeLines = countLines(notice);
+	const maxPreviewBytes = Math.max(0, truncation.maxBytes - noticeBytes - 2);
+	const maxPreviewLines = Math.max(0, truncation.maxLines - noticeLines - 1);
+	const previewTruncation = truncateHead(content, {
+		maxBytes: maxPreviewBytes,
+		maxLines: maxPreviewLines,
+	});
+	let preview = previewTruncation.content;
+
+	if (maxPreviewLines > 0 && previewTruncation.truncatedBy === "bytes") {
+		preview = makePrefixPreview(content, maxPreviewBytes).replace(/\n+$/u, "");
+	}
+
+	return {
+		text: preview ? `${preview}\n\n${notice}` : notice,
+		truncation: {
+			...truncation,
+			content: preview,
+			outputLines: countLines(preview),
+			outputBytes: Buffer.byteLength(preview, "utf8"),
+			lastLinePartial: preview.length > 0 && preview.length < content.length && content[preview.length] !== "\n",
+		},
+	};
+}
 
 /**
  * Scans output using constant memory while retaining only enough data to produce a bounded preview.

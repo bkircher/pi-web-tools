@@ -146,6 +146,28 @@ test("deletes the working directory when Obscura fails", async () => {
 	assert.equal(removedWorkingDirectory, "/work");
 });
 
+test("limits diagnostic output from a failed Obscura command", async () => {
+	const storage: ObscuraStorage = {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw new Error("not used");
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => {},
+	};
+	const exec = async () => ({ stdout: "", stderr: "a".repeat(100_000), code: 2, killed: false });
+
+	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
+
+	await assert.rejects(result, (error) => {
+		assert.ok(error instanceof Error);
+		assert.equal(error.name, "ObscuraError");
+		assert.equal(Buffer.byteLength(error.message, "utf8"), 51_200);
+		assert.match(error.message, /\[Obscura failure output truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
+		return true;
+	});
+});
+
 test("reports a killed Obscura process as a typed timeout", async () => {
 	const storage: ObscuraStorage = {
 		createWorkingDirectory: async () => "/work",

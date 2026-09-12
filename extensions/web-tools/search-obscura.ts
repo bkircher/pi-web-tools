@@ -1,5 +1,7 @@
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import { execute, ObscuraError, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
+import { limitText } from "./output.js";
 import type { ResponseData, UntrustedResult } from "./search-types.js";
 
 type EvaluationData = {
@@ -12,6 +14,9 @@ export type RunObscura = typeof execute;
 
 const SEARCH_HOSTNAME = buildSearchUrl("").hostname;
 const SEARCH_TIMEOUT_SECONDS = 10;
+const OUTPUT_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
+const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} limit reached.]`;
+const FAILURE_TRUNCATION_NOTICE = `[DuckDuckGo search failure truncated: ${OUTPUT_LIMIT} limit reached.]`;
 
 const SEARCH_EVALUATION_SCRIPT = `(() => {
 	const challenge = Boolean(document.querySelector(
@@ -143,7 +148,11 @@ export async function searchDuckDuckGo(
 		if (error instanceof ObscuraError && error.code === "timeout") {
 			throw new Error(`DuckDuckGo search timed out after ${SEARCH_TIMEOUT_SECONDS} seconds`, { cause: error });
 		}
-		throw new Error(`DuckDuckGo search failed through Obscura: ${errorReason(error)}`, { cause: error });
+		const failure = limitText(
+			`DuckDuckGo search failed through Obscura: ${errorReason(error)}`,
+			FAILURE_TRUNCATION_NOTICE,
+		);
+		throw new Error(failure.text, { cause: error });
 	}
 
 	if (options.signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
@@ -154,11 +163,12 @@ export async function searchDuckDuckGo(
 		throw new Error("DuckDuckGo blocked the search with an anti-bot challenge");
 	}
 
+	const stderr = execution.stderr ? limitText(execution.stderr, STDERR_TRUNCATION_NOTICE).text : undefined;
 	return {
 		backend: "obscura",
 		searchUrl,
 		bytes: execution.output.scan.bytes,
 		results: normalizeResults(evaluation.results, MAX_RESULTS),
-		...(execution.stderr ? { stderr: execution.stderr } : {}),
+		...(stderr ? { stderr } : {}),
 	};
 }

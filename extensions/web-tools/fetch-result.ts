@@ -1,6 +1,13 @@
-import { formatSize, type AgentToolResult } from "@earendil-works/pi-coding-agent";
+import {
+	DEFAULT_MAX_BYTES,
+	DEFAULT_MAX_LINES,
+	formatSize,
+	type AgentToolResult,
+	type TruncationResult,
+} from "@earendil-works/pi-coding-agent";
 import type { Details } from "./fetch-types.js";
 import type { Execution, Request } from "./obscura.js";
+import { limitText, type LimitedText } from "./output.js";
 
 function makePrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
 	let bytes = 0;
@@ -19,7 +26,10 @@ function makePrefixPreview(content: string, maxBytes: number): { content: string
 	};
 }
 
-function formatOutput(execution: Execution): string {
+const OUTPUT_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
+const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} limit reached.]`;
+
+function formatOutput(execution: Execution, stderr: string | undefined): LimitedText {
 	const { output } = execution;
 	const { truncation } = output.scan;
 	let text = truncation.content;
@@ -41,20 +51,30 @@ function formatOutput(execution: Execution): string {
 	}
 
 	if (!text) text = "No content returned.";
-	if (execution.stderr) text += `\n\n[Obscura stderr]\n${execution.stderr}`;
-	return text;
+	if (stderr) text += `\n\n[Obscura stderr]\n${stderr}`;
+
+	const retainedOutput = output.retention === "retain" ? ` Full page output saved to: ${output.fullOutputPath}` : "";
+	return limitText(text, `[Tool output truncated: ${OUTPUT_LIMIT} limit reached.${retainedOutput}]`);
 }
 
 export function createResult(request: Request, execution: Execution, elapsedMs: number): AgentToolResult<Details> {
 	const { output } = execution;
-	const outputDetails =
-		output.retention === "retain"
-			? {
-					truncated: true as const,
-					truncation: output.scan.truncation,
-					fullOutputPath: output.fullOutputPath,
-				}
-			: { truncated: false as const };
+	const limitedStderr = execution.stderr ? limitText(execution.stderr, STDERR_TRUNCATION_NOTICE) : undefined;
+	const formattedOutput = formatOutput(execution, execution.stderr);
+	const effectiveTruncation: TruncationResult | undefined = formattedOutput.truncation.truncated
+		? formattedOutput.truncation
+		: output.retention === "retain"
+			? output.scan.truncation
+			: limitedStderr?.truncation.truncated
+				? limitedStderr.truncation
+				: undefined;
+	const outputDetails = effectiveTruncation
+		? {
+				truncated: true as const,
+				truncation: effectiveTruncation,
+				...(output.retention === "retain" ? { fullOutputPath: output.fullOutputPath } : {}),
+			}
+		: { truncated: false as const };
 	const commonDetails = {
 		url: request.url,
 		waitUntil: request.waitUntil,
@@ -65,7 +85,7 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 		elapsedMs,
 		bytes: output.scan.bytes,
 		...outputDetails,
-		...(execution.stderr ? { stderr: execution.stderr } : {}),
+		...(limitedStderr ? { stderr: limitedStderr.text } : {}),
 	};
 	const details: Details =
 		request.mode === "eval"
@@ -78,7 +98,7 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 				};
 
 	return {
-		content: [{ type: "text", text: formatOutput(execution) }],
+		content: [{ type: "text", text: formattedOutput.text }],
 		details,
 	};
 }

@@ -89,12 +89,14 @@ Parameters:
 
 Output limits:
 
- -  Tool output returned to the model is truncated to pi's standard limit: 2000
-    lines or 50.0 KB, whichever comes first.
- -  If output is truncated, the full Obscura output is left in a per-user
-    temporary file and the path is included in the tool result.
- -  Obscura output is scanned from disk using constant memory; only the bounded
-    preview returned to the model is retained in memory.
+ -  Page content and Obscura diagnostics returned to the model are limited
+    together to pi's standard limit: 2000 lines or 50.0 KB, whichever comes
+    first.
+ -  If page content is truncated, the full page output is left in a per-user
+    temporary file and the path is included in the tool result. Truncated
+    diagnostics are not retained.
+ -  Obscura page output is scanned from disk using constant memory; only the
+    bounded preview returned to the model is retained in memory.
 
 [`obscura`]: https://github.com/h4ckf0r0day/obscura
 

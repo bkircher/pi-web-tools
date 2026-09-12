@@ -2,9 +2,15 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	DEFAULT_MAX_BYTES,
+	DEFAULT_MAX_LINES,
+	formatSize,
+	type ExecResult,
+	type ExtensionAPI,
+} from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "./fetch-types.js";
-import { scan, type ScanResult } from "./output.js";
+import { limitText, scan, type ScanResult } from "./output.js";
 
 type RequestBase = {
 	url: string;
@@ -130,6 +136,12 @@ async function prepareOutput(source: OutputSource, storage: Storage): Promise<Pr
 	};
 }
 
+const DIAGNOSTIC_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
+
+function limitDiagnostic(content: string, source: string) {
+	return limitText(content, `[${source} truncated: ${DIAGNOSTIC_LIMIT} limit reached.]`);
+}
+
 function assertSucceeded(result: ExecResult, signal?: AbortSignal): void {
 	if (result.killed) {
 		if (signal?.aborted) {
@@ -140,10 +152,9 @@ function assertSucceeded(result: ExecResult, signal?: AbortSignal): void {
 	if (result.code !== 0) {
 		const stderr = result.stderr.trim();
 		const stdout = result.stdout.trim();
-		throw new ObscuraError(
-			"command-failed",
-			`obscura fetch failed with exit code ${result.code}: ${stderr || stdout || "no error output"}`,
-		);
+		const message = `obscura fetch failed with exit code ${result.code}: ${stderr || stdout || "no error output"}`;
+		const limitedMessage = limitDiagnostic(message, "Obscura failure output");
+		throw new ObscuraError("command-failed", limitedMessage.text);
 	}
 }
 

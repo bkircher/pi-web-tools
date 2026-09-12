@@ -18,7 +18,7 @@ export type Details = {
 	stderr?: string;
 } & (
 	| { truncated: false; truncation?: never; fullOutputPath?: never }
-	| { truncated: true; truncation: TruncationResult; fullOutputPath: string }
+	| { truncated: true; truncation: TruncationResult; fullOutputPath?: string }
 ) &
 	(
 		| { mode: "dump"; dump: DumpMode; eval?: never; selector?: string }

@@ -73,6 +73,20 @@ test("searches with a fixed Obscura evaluation and normalizes results", async ()
 	assert.equal(capturedOptions?.exec, unusedExec);
 });
 
+test("limits stderr returned with search details", async () => {
+	const execution = await createExecution(validEvaluation, "a".repeat(100_000));
+	const runObscura: RunObscura = async () => execution;
+
+	const response = await searchDuckDuckGo("stderr limit test", {
+		exec: unusedExec,
+		cwd: "/project",
+		runObscura,
+	});
+
+	assert.equal(Buffer.byteLength(response.stderr ?? "", "utf8"), 51_200);
+	assert.match(response.stderr ?? "", /\[Obscura stderr truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
+});
+
 test("reports a DuckDuckGo anti-bot challenge", async () => {
 	const execution = await createExecution({ ...validEvaluation, challenge: true });
 	const runObscura: RunObscura = async () => execution;
@@ -182,6 +196,25 @@ test("does not infer a timeout from command failure text", async () => {
 	await assert.rejects(result, {
 		message:
 			"DuckDuckGo search failed through Obscura: obscura fetch failed with exit code 2: invalid timeout argument",
+	});
+});
+
+test("limits diagnostic output in a search failure", async () => {
+	const runObscura: RunObscura = async () => {
+		throw new ObscuraError("command-failed", "a".repeat(100_000));
+	};
+
+	const result = searchDuckDuckGo("failure limit test", {
+		exec: unusedExec,
+		cwd: "/project",
+		runObscura,
+	});
+
+	await assert.rejects(result, (error) => {
+		assert.ok(error instanceof Error);
+		assert.equal(Buffer.byteLength(error.message, "utf8"), 51_200);
+		assert.match(error.message, /\[DuckDuckGo search failure truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
+		return true;
 	});
 });
 

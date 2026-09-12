@@ -116,6 +116,152 @@ test("web_search serializes registrations and spaces their start times", async (
 	assert.equal(secondCalls, 1);
 });
 
+test("web_search cancels a queued request before an earlier search completes", async () => {
+	const execution = await createExecution();
+	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
+	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
+	let secondCalls = 0;
+	const firstTool = getSearchTool(async () => {
+		markFirstStarted();
+		return firstExecution;
+	});
+	const secondTool = getSearchTool(async () => {
+		secondCalls += 1;
+		return execution;
+	});
+	const controller = new AbortController();
+	let cancellation: unknown;
+
+	const firstResult = firstTool.execute(
+		"first",
+		{ query: "active search before queued cancellation" },
+		undefined,
+		undefined,
+		toolContext,
+	);
+	const secondResult = secondTool.execute(
+		"second",
+		{ query: "queued cancellation query" },
+		controller.signal,
+		undefined,
+		toolContext,
+	);
+	void secondResult.catch((error: unknown) => {
+		cancellation = error;
+	});
+	await firstStarted;
+	controller.abort();
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	const cancellationBeforeFirstCompleted = cancellation;
+	completeFirst(execution);
+	await firstResult;
+	await assert.rejects(secondResult, { message: "DuckDuckGo search was cancelled" });
+	await new Promise<void>((resolve) => setImmediate(resolve));
+
+	assert.ok(cancellationBeforeFirstCompleted instanceof Error);
+	assert.equal(cancellationBeforeFirstCompleted.message, "DuckDuckGo search was cancelled");
+	assert.equal(secondCalls, 0);
+});
+
+test("web_search cancels its interval delay and releases the queue", async (context) => {
+	const execution = await createExecution();
+	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
+	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
+	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
+	let secondCalls = 0;
+	let thirdCalls = 0;
+	const firstTool = getSearchTool(async () => {
+		markFirstStarted();
+		return firstExecution;
+	});
+	const secondTool = getSearchTool(async () => {
+		secondCalls += 1;
+		return execution;
+	});
+	const thirdTool = getSearchTool(async () => {
+		thirdCalls += 1;
+		return execution;
+	});
+	const controller = new AbortController();
+	let cancellation: unknown;
+
+	const firstResult = firstTool.execute(
+		"first",
+		{ query: "active search before interval cancellation" },
+		undefined,
+		undefined,
+		toolContext,
+	);
+	await firstStarted;
+	const secondResult = secondTool.execute(
+		"second",
+		{ query: "cancelled interval query" },
+		controller.signal,
+		undefined,
+		toolContext,
+	);
+	void secondResult.catch((error: unknown) => {
+		cancellation = error;
+	});
+	completeFirst(execution);
+	await firstResult;
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	controller.abort();
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	const cancellationDuringDelay = cancellation;
+	context.mock.timers.setTime(2000);
+	const thirdResult = thirdTool.execute(
+		"third",
+		{ query: "search after interval cancellation" },
+		undefined,
+		undefined,
+		toolContext,
+	);
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	const thirdCallsBeforeTimerAdvance = thirdCalls;
+	context.mock.timers.tick(1000);
+	await assert.rejects(secondResult, { message: "DuckDuckGo search was cancelled" });
+	await thirdResult;
+
+	assert.ok(cancellationDuringDelay instanceof Error);
+	assert.equal(cancellationDuringDelay.message, "DuckDuckGo search was cancelled");
+	assert.equal(secondCalls, 0);
+	assert.equal(thirdCallsBeforeTimerAdvance, 1);
+});
+
+test("web_search continues queued searches after a failure", async (context) => {
+	const execution = await createExecution();
+	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 4000 });
+	let secondCalls = 0;
+	const firstTool = getSearchTool(async () => {
+		throw new Error("planned queue failure");
+	});
+	const secondTool = getSearchTool(async () => {
+		secondCalls += 1;
+		return execution;
+	});
+
+	const firstResult = firstTool.execute("first", { query: "failed queue query" }, undefined, undefined, toolContext);
+	const secondResult = secondTool.execute(
+		"second",
+		{ query: "query after queue failure" },
+		undefined,
+		undefined,
+		toolContext,
+	);
+	await assert.rejects(firstResult, {
+		message: "DuckDuckGo search failed through Obscura: planned queue failure",
+	});
+	await Promise.resolve();
+	context.mock.timers.tick(999);
+	await Promise.resolve();
+	assert.equal(secondCalls, 0);
+	context.mock.timers.tick(1);
+	await secondResult;
+
+	assert.equal(secondCalls, 1);
+});
+
 test("web_search reuses a queued response from the cache", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["Date"], now: 2000 });

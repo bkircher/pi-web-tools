@@ -26,6 +26,60 @@ const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
 const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
+function createCancellationError(): Error {
+	return new Error("DuckDuckGo search was cancelled");
+}
+
+function abortableDelay(ms: number, signal: AbortSignal | undefined): Promise<void> {
+	if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+	if (signal.aborted) return Promise.reject(createCancellationError());
+
+	return new Promise((resolve, reject) => {
+		const onAbort = () => {
+			clearTimeout(timeout);
+			signal.removeEventListener("abort", onAbort);
+			reject(createCancellationError());
+		};
+		const timeout = setTimeout(() => {
+			signal.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		signal.addEventListener("abort", onAbort, { once: true });
+	});
+}
+
+function raceWithCancellation<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+	if (!signal) return operation;
+
+	return new Promise((resolve, reject) => {
+		let settled = false;
+		const cleanup = () => signal.removeEventListener("abort", onAbort);
+		const onAbort = () => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			reject(createCancellationError());
+		};
+
+		signal.addEventListener("abort", onAbort, { once: true });
+		void operation.then(
+			(value) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				resolve(value);
+			},
+			(error: unknown) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				reject(error);
+			},
+		);
+		if (signal.aborted) onAbort();
+	});
+}
+
 let searchQueue: Promise<void> = Promise.resolve();
 let activeOrQueuedSearches = 0;
 let lastSearchStartedAt = 0;
@@ -91,16 +145,16 @@ function getSearchResponse(
 	const mustWaitForInterval = activeOrQueuedSearches > 0;
 	activeOrQueuedSearches += 1;
 
-	const result = searchQueue.then(async () => {
-		if (signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
+	const queuedResult = searchQueue.then(async () => {
+		if (signal?.aborted) throw createCancellationError();
 
 		const queuedResponse = getCached(cache, query);
 		if (queuedResponse) return { response: queuedResponse, cached: true };
 
 		if (mustWaitForInterval) {
 			const waitMs = Math.max(0, lastSearchStartedAt + MIN_QUEUED_SEARCH_INTERVAL_MS - Date.now());
-			if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
-			if (signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
+			if (waitMs > 0) await abortableDelay(waitMs, signal);
+			if (signal?.aborted) throw createCancellationError();
 		}
 
 		lastSearchStartedAt = Date.now();
@@ -109,7 +163,7 @@ function getSearchResponse(
 		return { response, cached: false };
 	});
 
-	searchQueue = result.then(
+	searchQueue = queuedResult.then(
 		() => {
 			activeOrQueuedSearches -= 1;
 		},
@@ -117,7 +171,7 @@ function getSearchResponse(
 			activeOrQueuedSearches -= 1;
 		},
 	);
-	return result;
+	return raceWithCancellation(queuedResult, signal);
 }
 
 function formatResults(results: Result[]): string {

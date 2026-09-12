@@ -63,6 +63,24 @@ test("web_search keeps cache state within each registration", async () => {
 	assert.equal(secondCached.details?.results[0]?.title, "Second registration");
 });
 
+test("web_search rejects a cached response when already cancelled", async () => {
+	const execution = await createExecution();
+	let calls = 0;
+	const tool = getSearchTool(async () => {
+		calls += 1;
+		return execution;
+	});
+	const query = { query: "cancelled cached query" };
+	await tool.execute("initial", query, undefined, undefined, toolContext);
+	const controller = new AbortController();
+	controller.abort();
+
+	const result = tool.execute("cached", query, controller.signal, undefined, toolContext);
+
+	await assert.rejects(result, { message: "DuckDuckGo search was cancelled" });
+	assert.equal(calls, 1);
+});
+
 test("web_search serializes registrations and spaces their start times", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });

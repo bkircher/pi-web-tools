@@ -24,6 +24,8 @@ type CachedResponse = {
 	cached: boolean;
 };
 
+type ScheduledOperation<T> = { status: "complete"; value: T } | { status: "ready"; execute: () => Promise<T> };
+
 type SearchToolOptions = {
 	runObscura?: RunObscura;
 };
@@ -35,6 +37,10 @@ const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
 function createCancellationError(): Error {
 	return new Error("DuckDuckGo search was cancelled");
+}
+
+function throwIfCancelled(signal: AbortSignal | undefined): void {
+	if (signal?.aborted) throw createCancellationError();
 }
 
 function raceWithCancellation<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
@@ -120,34 +126,23 @@ function setCached(cache: SearchCache, query: string, response: ResponseData): v
 	}
 }
 
-function getSearchResponse(
-	cache: SearchCache,
-	query: string,
-	signal: AbortSignal | undefined,
-	load: () => Promise<ResponseData>,
-): Promise<CachedResponse> {
-	const cachedResponse = getCached(cache, query);
-	if (cachedResponse) return Promise.resolve({ response: cachedResponse, cached: true });
-
+function scheduleSearch<T>(signal: AbortSignal | undefined, prepare: () => ScheduledOperation<T>): Promise<T> {
 	const mustWaitForInterval = activeOrQueuedSearches > 0;
 	activeOrQueuedSearches += 1;
 
 	const queuedResult = searchQueue.then(async () => {
-		if (signal?.aborted) throw createCancellationError();
-
-		const queuedResponse = getCached(cache, query);
-		if (queuedResponse) return { response: queuedResponse, cached: true };
+		throwIfCancelled(signal);
+		const operation = prepare();
+		if (operation.status === "complete") return operation.value;
 
 		if (mustWaitForInterval) {
 			const waitMs = Math.max(0, lastSearchStartedAt + MIN_QUEUED_SEARCH_INTERVAL_MS - Date.now());
 			if (waitMs > 0) await delay(waitMs, undefined, { signal });
-			if (signal?.aborted) throw createCancellationError();
+			throwIfCancelled(signal);
 		}
 
 		lastSearchStartedAt = Date.now();
-		const response = await load();
-		setCached(cache, query, response);
-		return { response, cached: false };
+		return operation.execute();
 	});
 
 	searchQueue = queuedResult
@@ -157,6 +152,33 @@ function getSearchResponse(
 		})
 		.catch(() => undefined);
 	return raceWithCancellation(queuedResult, signal);
+}
+
+function getSearchResponse(
+	cache: SearchCache,
+	query: string,
+	signal: AbortSignal | undefined,
+	load: () => Promise<ResponseData>,
+): Promise<CachedResponse> {
+	throwIfCancelled(signal);
+	const cachedResponse = getCached(cache, query);
+	if (cachedResponse) return Promise.resolve({ response: cachedResponse, cached: true });
+
+	return scheduleSearch<CachedResponse>(signal, () => {
+		const queuedResponse = getCached(cache, query);
+		if (queuedResponse) {
+			return { status: "complete", value: { response: queuedResponse, cached: true } };
+		}
+
+		return {
+			status: "ready",
+			execute: async () => {
+				const response = await load();
+				setCached(cache, query, response);
+				return { response, cached: false };
+			},
+		};
+	});
 }
 
 function formatResults(results: Result[]): string {

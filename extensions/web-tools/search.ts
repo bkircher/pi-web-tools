@@ -1,4 +1,5 @@
-import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { setTimeout as delay } from "node:timers/promises";
+import type { AgentToolResult, ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { MAX_RESULTS } from "./duckduckgo.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
@@ -30,53 +31,16 @@ function createCancellationError(): Error {
 	return new Error("DuckDuckGo search was cancelled");
 }
 
-function abortableDelay(ms: number, signal: AbortSignal | undefined): Promise<void> {
-	if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
-	if (signal.aborted) return Promise.reject(createCancellationError());
-
-	return new Promise((resolve, reject) => {
-		const onAbort = () => {
-			clearTimeout(timeout);
-			signal.removeEventListener("abort", onAbort);
-			reject(createCancellationError());
-		};
-		const timeout = setTimeout(() => {
-			signal.removeEventListener("abort", onAbort);
-			resolve();
-		}, ms);
-		signal.addEventListener("abort", onAbort, { once: true });
-	});
-}
-
 function raceWithCancellation<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
 	if (!signal) return operation;
 
-	return new Promise((resolve, reject) => {
-		let settled = false;
-		const cleanup = () => signal.removeEventListener("abort", onAbort);
-		const onAbort = () => {
-			if (settled) return;
-			settled = true;
-			cleanup();
-			reject(createCancellationError());
-		};
+	const { promise: cancellation, reject } = Promise.withResolvers<never>();
+	const onAbort = () => reject(createCancellationError());
+	signal.addEventListener("abort", onAbort, { once: true });
+	if (signal.aborted) onAbort();
 
-		signal.addEventListener("abort", onAbort, { once: true });
-		void operation.then(
-			(value) => {
-				if (settled) return;
-				settled = true;
-				cleanup();
-				resolve(value);
-			},
-			(error: unknown) => {
-				if (settled) return;
-				settled = true;
-				cleanup();
-				reject(error);
-			},
-		);
-		if (signal.aborted) onAbort();
+	return Promise.race([operation, cancellation]).finally(() => {
+		signal.removeEventListener("abort", onAbort);
 	});
 }
 
@@ -100,6 +64,11 @@ const parameters = Type.Object({
 });
 
 export type SearchParameters = Static<typeof parameters>;
+export type SearchTool = ToolDefinition<typeof parameters, Details>;
+
+type SearchExtensionAPI = Pick<ExtensionAPI, "exec"> & {
+	registerTool(tool: SearchTool): void;
+};
 
 function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -153,7 +122,7 @@ function getSearchResponse(
 
 		if (mustWaitForInterval) {
 			const waitMs = Math.max(0, lastSearchStartedAt + MIN_QUEUED_SEARCH_INTERVAL_MS - Date.now());
-			if (waitMs > 0) await abortableDelay(waitMs, signal);
+			if (waitMs > 0) await delay(waitMs, undefined, { signal });
 			if (signal?.aborted) throw createCancellationError();
 		}
 
@@ -163,14 +132,12 @@ function getSearchResponse(
 		return { response, cached: false };
 	});
 
-	searchQueue = queuedResult.then(
-		() => {
+	searchQueue = queuedResult
+		.then(() => undefined)
+		.finally(() => {
 			activeOrQueuedSearches -= 1;
-		},
-		() => {
-			activeOrQueuedSearches -= 1;
-		},
-	);
+		})
+		.catch(() => undefined);
 	return raceWithCancellation(queuedResult, signal);
 }
 
@@ -187,7 +154,7 @@ function formatResults(results: Result[]): string {
 /**
  * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
-export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
+export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions = {}): void {
 	const cache: SearchCache = new Map();
 
 	pi.registerTool({

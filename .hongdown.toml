@@ -1,0 +1,16 @@
+include = ["**/*.md"]
+exclude = [
+  "node_modules/**",
+]
+
+[heading]
+sentence_case = false
+proper_nouns = [
+  "pi",
+]
+
+[code_block.formatters]
+javascript = ["deno", "fmt", "--ext=js", "-"]
+json = ["deno", "fmt", "--ext=jsonc", "-"]
+jsonc = ["deno", "fmt", "--ext=jsonc", "-"]
+typescript = ["deno", "fmt", "--ext=ts", "-"]

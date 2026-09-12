@@ -52,14 +52,8 @@ async function createExecution(): Promise<Execution> {
 test("web_search serializes parallel requests and spaces their start times", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
-	let markFirstStarted!: () => void;
-	const firstStarted = new Promise<void>((resolve) => {
-		markFirstStarted = resolve;
-	});
-	let completeFirst!: (execution: Execution) => void;
-	const firstExecution = new Promise<Execution>((resolve) => {
-		completeFirst = resolve;
-	});
+	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
+	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
 	const executions = [firstExecution, Promise.resolve(execution)];
 	let calls = 0;
 	const runObscura: RunObscura = async () => {
@@ -101,10 +95,7 @@ test("web_search serializes parallel requests and spaces their start times", asy
 test("web_search reuses a queued response from the cache", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["Date"], now: 2000 });
-	let completeFirst!: (execution: Execution) => void;
-	const firstExecution = new Promise<Execution>((resolve) => {
-		completeFirst = resolve;
-	});
+	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
 	let calls = 0;
 	const runObscura: RunObscura = async () => {
 		calls += 1;

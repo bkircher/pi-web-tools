@@ -7,6 +7,17 @@ export type Result = {
 };
 
 const DUCKDUCKGO_ORIGIN = "https://html.duckduckgo.com";
+const SEARCH_URL = `${DUCKDUCKGO_ORIGIN}/html/`;
+
+export const MAX_RESULTS = 20;
+
+export function buildSearchUrl(query: string): URL {
+	const url = new URL(SEARCH_URL);
+	url.searchParams.set("q", query);
+	url.searchParams.set("kl", "wt-wt");
+	url.searchParams.set("kp", "-1");
+	return url;
+}
 
 function normalizeWhitespace(value: string): string {
 	return value.replace(/\s+/gu, " ").trim();

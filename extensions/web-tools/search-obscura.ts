@@ -1,6 +1,5 @@
-import { normalizeResults } from "./duckduckgo.js";
+import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import { execute, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
-import { buildSearchUrl } from "./render.js";
 import type { ResponseData } from "./search-types.js";
 
 export type RawResult = {
@@ -18,7 +17,6 @@ type EvaluationData = {
 export type RunObscura = (request: Request, options: ExecuteOptions) => Promise<Execution>;
 
 const SEARCH_HOSTNAME = "html.duckduckgo.com";
-const MAX_RESULTS = 20;
 const SEARCH_TIMEOUT_SECONDS = 10;
 
 const SEARCH_EVALUATION_SCRIPT = `(() => {
@@ -26,7 +24,7 @@ const SEARCH_EVALUATION_SCRIPT = `(() => {
 		"#challenge-form, .anomaly-modal__modal, .anomaly-modal__challenge, form[action*='anomaly.js']",
 	));
 	const results = Array.from(document.querySelectorAll("a.result__a"))
-		.slice(0, 20)
+		.slice(0, ${MAX_RESULTS})
 		.map((link) => {
 			const container = link.closest(".result");
 			const snippet = container?.querySelector(".result__snippet");

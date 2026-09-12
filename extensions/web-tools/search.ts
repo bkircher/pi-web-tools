@@ -1,6 +1,6 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import type { Result } from "./duckduckgo.js";
+import { MAX_RESULTS, type Result } from "./duckduckgo.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
 import { searchDuckDuckGo, type RunObscura } from "./search-obscura.js";
 import type { Details, ResponseData } from "./search-types.js";
@@ -22,7 +22,6 @@ type SearchToolOptions = {
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
-const MAX_LIMIT = 20;
 const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
 const cache = new Map<string, CacheEntry>();
@@ -38,9 +37,9 @@ const parameters = Type.Object({
 	}),
 	limit: Type.Optional(
 		Type.Integer({
-			description: `Maximum number of search results to return (1-${MAX_LIMIT}, default 10)`,
+			description: `Maximum number of search results to return (1-${MAX_RESULTS}, default 10)`,
 			minimum: 1,
-			maximum: MAX_LIMIT,
+			maximum: MAX_RESULTS,
 		}),
 	),
 });

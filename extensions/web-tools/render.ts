@@ -5,14 +5,13 @@ import {
 	type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { buildSearchUrl } from "./duckduckgo.js";
 import type { FetchParameters } from "./fetch.js";
 import type { Details as FetchDetails } from "./fetch-types.js";
 import type { SearchParameters } from "./search.js";
 import type { Details as SearchDetails } from "./search-types.js";
 
 type RenderContext = { isError: boolean };
-
-export const SEARCH_URL = "https://html.duckduckgo.com/html/";
 
 const UNSAFE_TERMINAL_PATTERN = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
 
@@ -29,14 +28,6 @@ function getDisplayUrl(value: string): string {
 	} catch {
 		return escapeUnsafeCharacters(value);
 	}
-}
-
-export function buildSearchUrl(query: string): URL {
-	const url = new URL(SEARCH_URL);
-	url.searchParams.set("q", query);
-	url.searchParams.set("kl", "wt-wt");
-	url.searchParams.set("kp", "-1");
-	return url;
 }
 
 function getResultText(result: AgentToolResult<unknown>): string {

@@ -61,14 +61,12 @@ export function renderSearchResult(
 	}
 
 	const count = details.results.length;
-	const legacyStatus = (details as unknown as { status?: unknown }).status;
-	const isObscuraResult = details.backend === "obscura";
-	const stderr = (details as { stderr?: string }).stderr;
+	const stderr = details.stderr;
 	const summary = [
 		count === 0 ? "No results" : "✓",
-		isObscuraResult ? "Obscura" : typeof legacyStatus === "number" ? `HTTP ${legacyStatus}` : undefined,
+		"Obscura",
 		count === 0 ? undefined : `${count} ${count === 1 ? "result" : "results"}`,
-		`${formatSize(details.bytes)} ${isObscuraResult ? "output" : "HTML"}`,
+		`${formatSize(details.bytes)} output`,
 		`${details.elapsedMs}ms`,
 		details.cached ? "cached" : undefined,
 		stderr ? "stderr" : undefined,

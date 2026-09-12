@@ -92,19 +92,6 @@ test("web_search displays result content when expanded", () => {
 	]);
 });
 
-test("web_search renders saved Node response metadata", () => {
-	const result = createSearchResult();
-	result.details = {
-		...result.details,
-		backend: undefined,
-		status: 200,
-	} as unknown as SearchDetails;
-
-	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
-
-	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 1 result · 123B HTML · 3ms · cached"]);
-});
-
 test("web_fetch renders the requested URL", () => {
 	const component = renderWebFetchCall({ url: "https://example.com/docs" }, theme);
 

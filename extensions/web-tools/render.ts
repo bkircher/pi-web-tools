@@ -70,17 +70,21 @@ export function renderSearchResult(
 	}
 
 	const count = details.results.length;
+	const legacyStatus = (details as unknown as { status?: unknown }).status;
+	const isObscuraResult = details.backend === "obscura";
+	const stderr = (details as { stderr?: string }).stderr;
 	const summary = [
 		count === 0 ? "No results" : "✓",
-		`HTTP ${details.status}`,
+		isObscuraResult ? "Obscura" : typeof legacyStatus === "number" ? `HTTP ${legacyStatus}` : undefined,
 		count === 0 ? undefined : `${count} ${count === 1 ? "result" : "results"}`,
-		`${formatSize(details.bytes)} HTML`,
+		`${formatSize(details.bytes)} ${isObscuraResult ? "output" : "HTML"}`,
 		`${details.elapsedMs}ms`,
 		details.cached ? "cached" : undefined,
+		stderr ? "stderr" : undefined,
 	]
 		.filter((part): part is string => part !== undefined)
 		.join(" · ");
-	let text = theme.fg(count === 0 ? "warning" : "success", summary);
+	let text = theme.fg(count === 0 || stderr ? "warning" : "success", summary);
 	if (expanded && output) text += `\n${theme.fg("toolOutput", output)}`;
 	return new Text(text, 0, 0);
 }

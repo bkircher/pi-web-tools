@@ -30,7 +30,7 @@ export type Execution = {
 	stderr?: string;
 };
 
-type Exec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
+export type Exec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
 
 export type Storage = {
 	createWorkingDirectory(): Promise<string>;
@@ -39,7 +39,7 @@ export type Storage = {
 	removeWorkingDirectory(path: string): Promise<void>;
 };
 
-type ExecuteOptions = {
+export type ExecuteOptions = {
 	exec: Exec;
 	cwd: string;
 	signal?: AbortSignal;

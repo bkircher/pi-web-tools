@@ -1,9 +1,10 @@
 # pi-web-tools
 
 A pi extension that adds two tools to the
-[pi](https://github.com/earendil-works/pi) coding agent: `web_search`, powered
-by DuckDuckGo, and `web_fetch`, powered by the
-[Obscura](https://github.com/h4ckf0r0day/obscura) headless browser.
+[pi](https://github.com/earendil-works/pi) coding agent: `web_search`, which
+searches DuckDuckGo, and `web_fetch`, which fetches pages. Both tools use the
+[Obscura](https://github.com/h4ckf0r0day/obscura) headless browser. The
+`obscura` CLI must be installed and available on `PATH`.
 
 ## Tools
 
@@ -14,24 +15,30 @@ returned to the model.
 
 ### `web_search`
 
-Queries DuckDuckGo's non-JavaScript HTML endpoint and returns result titles,
-URLs, and snippets. It does not fetch the result pages.
+Opens DuckDuckGo's HTML search (`https://html.duckduckgo.com/html/?q=example`) through Obscura and returns result
+titles, URLs, and snippets. It does not fetch the result pages.
+
+The tool uses a fixed, extension-controlled JavaScript evaluation to read the
+final page URL, detect known DuckDuckGo challenge elements, and extract at most
+20 results. Query text is only added to the request URL; it is never added to
+the evaluation script. The tool rejects truncated or malformed evaluation
+output and results from an unexpected final host.
 
 Parameters:
 
 - `query`: search query, 1–500 characters.
 - `limit`: optional number of results to return, 1–20. Defaults to 10.
 
-Use `web_search` for discovery. Its compact summary includes the DuckDuckGo HTTP
-status, response HTML size, result count, elapsed time, and cache status.
-Concurrent network requests are serialized, and queued requests start at least
-one second apart. Failed network requests are not retried automatically.
+Use `web_search` for discovery. Its compact summary includes the Obscura
+backend, output size, result count, elapsed time, and cache status. Concurrent
+searches are serialized, and queued searches start at least one second apart.
+A detected anti-bot challenge fails the search. A failed search is not retried,
+and the tool does not fall back to a Node.js request or another backend.
 
 ### `web_fetch`
 
 Fetches a specific URL with the
-[`obscura`](https://github.com/h4ckf0r0day/obscura) CLI, which must be installed
-and available on `PATH`.
+[`obscura`](https://github.com/h4ckf0r0day/obscura) CLI.
 
 Behavior:
 

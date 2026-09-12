@@ -1,10 +1,11 @@
 import type { Result } from "./duckduckgo.js";
 
 export type ResponseData = {
+	backend: "obscura";
 	searchUrl: string;
-	status: number;
 	bytes: number;
 	results: Result[];
+	stderr?: string;
 };
 
 export type Details = ResponseData & {

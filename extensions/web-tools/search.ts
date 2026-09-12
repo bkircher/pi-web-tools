@@ -1,7 +1,8 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import { parseHtml, type Result } from "./duckduckgo.js";
-import { buildSearchUrl, renderSearchCall, renderSearchResult, SEARCH_URL } from "./render.js";
+import type { Result } from "./duckduckgo.js";
+import { renderSearchCall, renderSearchResult } from "./render.js";
+import { searchDuckDuckGo, type RunObscura } from "./search-obscura.js";
 import type { Details, ResponseData } from "./search-types.js";
 
 type CacheEntry = {
@@ -9,13 +10,19 @@ type CacheEntry = {
 	response: ResponseData;
 };
 
-const SEARCH_HOSTNAME = new URL(SEARCH_URL).hostname;
+type CachedResponse = {
+	response: ResponseData;
+	cached: boolean;
+};
+
+type SearchToolOptions = {
+	runObscura?: RunObscura;
+};
+
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const MAX_QUERY_LENGTH = 500;
 const MAX_LIMIT = 20;
-const MAX_HTML_BYTES = 2 * 1024 * 1024;
-const SEARCH_TIMEOUT_SECONDS = 10;
 const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
 const cache = new Map<string, CacheEntry>();
@@ -72,21 +79,11 @@ function setCached(query: string, response: ResponseData): void {
 	}
 }
 
-function makeSignals(signal: AbortSignal | undefined): {
-	requestSignal: AbortSignal;
-	timeoutSignal: AbortSignal;
-} {
-	const timeoutSignal = AbortSignal.timeout(SEARCH_TIMEOUT_SECONDS * 1000);
-	return {
-		requestSignal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
-		timeoutSignal,
-	};
-}
-
 function getSearchResponse(
 	query: string,
 	signal: AbortSignal | undefined,
-): Promise<{ response: ResponseData; cached: boolean }> {
+	load: () => Promise<ResponseData>,
+): Promise<CachedResponse> {
 	const cachedResponse = getCached(query);
 	if (cachedResponse) return Promise.resolve({ response: cachedResponse, cached: true });
 
@@ -106,7 +103,7 @@ function getSearchResponse(
 		}
 
 		lastSearchStartedAt = Date.now();
-		const response = await fetchHtml(query, signal);
+		const response = await load();
 		setCached(query, response);
 		return { response, cached: false };
 	});
@@ -122,25 +119,6 @@ function getSearchResponse(
 	return result;
 }
 
-function formatNetworkError(error: unknown): string {
-	const rootMessage = error instanceof Error && error.message ? error.message : String(error);
-	const cause = error instanceof Error ? error.cause : undefined;
-	const causes = cause instanceof AggregateError ? cause.errors : cause === undefined ? [] : [cause];
-	const codes = causes
-		.map((value) =>
-			typeof value === "object" && value !== null && "code" in value && typeof value.code === "string"
-				? value.code
-				: undefined,
-		)
-		.filter((code): code is string => code !== undefined);
-
-	if (codes.length > 0) return `${rootMessage} (${[...new Set(codes)].join(", ")})`;
-	const causeMessage = causes.find(
-		(value): value is Error => value instanceof Error && Boolean(value.message),
-	)?.message;
-	return causeMessage ? `${rootMessage} (cause: ${causeMessage})` : rootMessage;
-}
-
 function formatResults(results: Result[]): string {
 	return results
 		.map((result, index) => {
@@ -151,134 +129,36 @@ function formatResults(results: Result[]): string {
 		.join("\n\n");
 }
 
-function throwHtmlTooLarge(): never {
-	throw new Error(`DuckDuckGo returned more than ${MAX_HTML_BYTES} bytes of HTML`);
-}
-
-async function readHtml(response: Response): Promise<{ html: string; bytes: number }> {
-	const contentLength = response.headers.get("content-length");
-	if (contentLength) {
-		const contentLengthBytes = Number(contentLength);
-		if (Number.isFinite(contentLengthBytes) && contentLengthBytes > MAX_HTML_BYTES) {
-			throwHtmlTooLarge();
-		}
-	}
-
-	if (!response.body) return { html: "", bytes: 0 };
-
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let bytes = 0;
-	let html = "";
-
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-
-			bytes += value.byteLength;
-			if (bytes > MAX_HTML_BYTES) {
-				await reader.cancel().catch(() => {});
-				throwHtmlTooLarge();
-			}
-
-			html += decoder.decode(value, { stream: true });
-		}
-	} finally {
-		reader.releaseLock();
-	}
-
-	html += decoder.decode();
-	return { html, bytes };
-}
-
-function isRedirectStatus(status: number): boolean {
-	return status >= 300 && status < 400;
-}
-
-function getRedirectHostname(location: string, baseUrl: URL): string | undefined {
-	try {
-		return new URL(location, baseUrl).hostname;
-	} catch {
-		return undefined;
-	}
-}
-
-async function fetchHtml(query: string, signal: AbortSignal | undefined): Promise<ResponseData> {
-	const url = buildSearchUrl(query);
-	const { requestSignal, timeoutSignal } = makeSignals(signal);
-	let response: Response;
-
-	try {
-		response = await fetch(url, {
-			headers: {
-				accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-				"accept-language": "en-US,en;q=0.9",
-				"user-agent": "Mozilla/5.0",
-			},
-			redirect: "manual",
-			signal: requestSignal,
-		});
-	} catch (error) {
-		if (timeoutSignal.aborted && requestSignal.reason === timeoutSignal.reason) {
-			throw new Error(`DuckDuckGo search timed out after ${SEARCH_TIMEOUT_SECONDS} seconds`, { cause: error });
-		}
-		if (signal?.aborted && requestSignal.reason === signal.reason) {
-			throw new Error("DuckDuckGo search was cancelled", { cause: error });
-		}
-		throw new Error(`DuckDuckGo request failed before an HTTP response: ${formatNetworkError(error)}`, {
-			cause: error,
-		});
-	}
-
-	if (isRedirectStatus(response.status)) {
-		const location = response.headers.get("location");
-		const redirectHostname = location ? getRedirectHostname(location, url) : undefined;
-		if (redirectHostname && redirectHostname !== SEARCH_HOSTNAME) {
-			throw new Error(`DuckDuckGo search redirected to unexpected host: ${redirectHostname}`);
-		}
-		throw new Error(`DuckDuckGo search redirected unexpectedly: HTTP ${response.status}`);
-	}
-
-	if (!response.ok) {
-		throw new Error(`DuckDuckGo search failed: HTTP ${response.status}`);
-	}
-
-	const { html, bytes } = await readHtml(response);
-	if (response.status === 202) {
-		throw new Error("DuckDuckGo blocked the search with an anti-bot challenge (HTTP 202)");
-	}
-	return {
-		searchUrl: url.href,
-		status: response.status,
-		bytes,
-		results: parseHtml(html, MAX_LIMIT),
-	};
-}
-
 /**
- * Register the `web_search` tool, which searches DuckDuckGo's non-JavaScript HTML endpoint.
+ * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
-export function registerTool(pi: ExtensionAPI): void {
+export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
 	pi.registerTool({
 		name: "web_search",
 		label: "Web Search",
 		description:
-			"Search the web using DuckDuckGo's non-JavaScript HTML search page. Returns result titles, URLs, and snippets; does not fetch result pages.",
-		promptSnippet: "Search the web with DuckDuckGo HTML search and return titles, URLs, and snippets.",
+			"Search the web using DuckDuckGo HTML search through Obscura. Returns result titles, URLs, and snippets; does not fetch result pages.",
+		promptSnippet: "Search the web with DuckDuckGo through Obscura and return titles, URLs, and snippets.",
 		promptGuidelines: [
 			"Use web_search when the user asks for current or external web information that is not available in the repository.",
 			"When using web_search results in an answer, cite the relevant result URLs.",
 		],
 		parameters,
 
-		async execute(_toolCallId, params, signal): Promise<AgentToolResult<Details>> {
+		async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<Details>> {
 			const query = params.query.trim();
 			const limit = params.limit ?? 10;
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();
-			const { response, cached } = await getSearchResponse(query, signal);
+			const { response, cached } = await getSearchResponse(query, signal, () =>
+				searchDuckDuckGo(query, {
+					exec: (command, args, executeOptions) => pi.exec(command, args, executeOptions),
+					cwd: ctx.cwd,
+					signal,
+					runObscura: options.runObscura,
+				}),
+			);
 			const results = response.results.slice(0, limit);
 			const details: Details = {
 				...response,
@@ -291,12 +171,7 @@ export function registerTool(pi: ExtensionAPI): void {
 
 			if (results.length === 0) {
 				return {
-					content: [
-						{
-							type: "text",
-							text: "No search results found. The DuckDuckGo HTML format may also have changed.",
-						},
-					],
+					content: [{ type: "text", text: "No search results found." }],
 					details,
 				};
 			}

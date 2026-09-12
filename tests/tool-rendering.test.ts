@@ -25,8 +25,8 @@ function createSearchResult(overrides: Partial<SearchDetails> = {}): AgentToolRe
 	return {
 		content: [{ type: "text", text: "1. pnpm\n   https://pnpm.io/" }],
 		details: {
+			backend: "obscura",
 			searchUrl: "https://html.duckduckgo.com/html/?q=pnpm",
-			status: 200,
 			bytes: 123,
 			results: [{ title: "pnpm", url: "https://pnpm.io/" }],
 			query: "pnpm",
@@ -77,7 +77,7 @@ test("web_search keeps result content hidden in the collapsed summary", () => {
 
 	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
 
-	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 2 results · 123B HTML · 42ms"]);
+	assert.deepEqual(renderLines(component), ["✓ · Obscura · 2 results · 123B output · 42ms"]);
 });
 
 test("web_search displays result content when expanded", () => {
@@ -86,10 +86,23 @@ test("web_search displays result content when expanded", () => {
 	const component = renderWebSearchResult(result, { expanded: true, isPartial: false }, theme, renderContext);
 
 	assert.deepEqual(renderLines(component), [
-		"✓ · HTTP 200 · 1 result · 123B HTML · 3ms · cached",
+		"✓ · Obscura · 1 result · 123B output · 3ms · cached",
 		"1. pnpm",
 		"   https://pnpm.io/",
 	]);
+});
+
+test("web_search renders saved Node response metadata", () => {
+	const result = createSearchResult();
+	result.details = {
+		...result.details,
+		backend: undefined,
+		status: 200,
+	} as unknown as SearchDetails;
+
+	const component = renderWebSearchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
+
+	assert.deepEqual(renderLines(component), ["✓ · HTTP 200 · 1 result · 123B HTML · 3ms · cached"]);
 });
 
 test("web_fetch renders the requested URL", () => {

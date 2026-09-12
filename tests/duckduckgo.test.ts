@@ -1,90 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseHtml as parseDuckDuckGoHtml } from "../extensions/web-tools/duckduckgo.ts";
+import {
+	normalizeResults as normalizeDuckDuckGoResults,
+	normalizeResultUrl,
+} from "../extensions/web-tools/duckduckgo.ts";
 
-test("extracts decoded titles, snippets, and DuckDuckGo redirect URLs", () => {
-	const html = `
-		<div class="result web-result">
-			<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fdocs%3Fx%3D1%26y%3D2&amp;rut=ignored">
-				Example &amp; <strong>Docs</strong>
-			</a>
-			<div class="result__snippet">Read <em>great</em> docs &amp; examples.</div>
-		</div>
-	`;
+test("normalizes result text and DuckDuckGo redirect URLs", () => {
+	const rawResults = [
+		{
+			title: "  Example \n Docs  ",
+			href: "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fdocs%3Fx%3D1%26y%3D2&rut=ignored",
+			snippet: " Read\tgreat docs. ",
+		},
+	];
 
-	const results = parseDuckDuckGoHtml(html, 20);
+	const results = normalizeDuckDuckGoResults(rawResults, 20);
 
 	assert.deepEqual(results, [
 		{
-			title: "Example & Docs",
+			title: "Example Docs",
 			url: "https://example.com/docs?x=1&y=2",
-			snippet: "Read great docs & examples.",
+			snippet: "Read great docs.",
 		},
-	]);
-});
-
-test("does not borrow a snippet from a neighboring result", () => {
-	const html = `
-		<div class="result">
-			<a class="result__a" href="https://first.example/">First</a>
-		</div>
-		<div class="result">
-			<a class="result__a" href="https://second.example/">Second</a>
-			<div class="result__snippet">Second snippet</div>
-		</div>
-	`;
-
-	const results = parseDuckDuckGoHtml(html, 20);
-
-	assert.deepEqual(results, [
-		{ title: "First", url: "https://first.example/" },
-		{ title: "Second", url: "https://second.example/", snippet: "Second snippet" },
 	]);
 });
 
 test("does not unwrap uddg parameters on non-DuckDuckGo URLs", () => {
-	const html = `
-		<div class="result">
-			<a class="result__a" href="https://example.com/?uddg=https%3A%2F%2Fevil.example%2F">Example</a>
-		</div>
-	`;
+	const href = "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F";
 
-	const results = parseDuckDuckGoHtml(html, 20);
+	const result = normalizeResultUrl(href);
 
-	assert.deepEqual(results, [
-		{
-			title: "Example",
-			url: "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F",
-		},
-	]);
+	assert.equal(result, "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F");
 });
 
-test("extracts results from malformed but recoverable HTML", () => {
-	const html = `
-		<div class=result>
-			<a class=result__a href=https://example.com>Broken <b>title</b></a>
-			<div class=result__snippet>Useful <i>text
-	`;
+test("does not unwrap DuckDuckGo links outside the redirect path", () => {
+	const href = "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F";
 
-	const results = parseDuckDuckGoHtml(html, 20);
+	const result = normalizeResultUrl(href);
 
-	assert.deepEqual(results, [
-		{
-			title: "Broken title",
-			url: "https://example.com/",
-			snippet: "Useful text",
-		},
-	]);
+	assert.equal(result, "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F");
 });
 
 test("stops collecting results at the requested limit", () => {
-	const html = `
-		<div class="result"><a class="result__a" href="https://one.example/">One</a></div>
-		<div class="result"><a class="result__a" href="https://two.example/">Two</a></div>
-		<div class="result"><a class="result__a" href="https://three.example/">Three</a></div>
-	`;
+	const rawResults = [
+		{ title: "One", href: "https://one.example/" },
+		{ title: "Two", href: "https://two.example/" },
+		{ title: "Three", href: "https://three.example/" },
+	];
 
-	const results = parseDuckDuckGoHtml(html, 2);
+	const results = normalizeDuckDuckGoResults(rawResults, 2);
 
 	assert.deepEqual(results, [
 		{ title: "One", url: "https://one.example/" },
@@ -92,14 +56,18 @@ test("stops collecting results at the requested limit", () => {
 	]);
 });
 
-test("omits duplicate and non-HTTP result URLs", () => {
-	const html = `
-		<div class="result"><a class="result__a" href="https://example.com/">First</a></div>
-		<div class="result"><a class="result__a" href="https://example.com/">Duplicate</a></div>
-		<div class="result"><a class="result__a" href="javascript:alert(1)">Script</a></div>
-	`;
+test("omits duplicate, unsafe, and invalid results", () => {
+	const rawResults = [
+		{ title: "First", href: "https://example.com/" },
+		{ title: "Duplicate", href: "https://example.com/" },
+		{ title: "Script", href: "javascript:alert(1)" },
+		{ title: "Mail", href: "mailto:test@example.com" },
+		{ title: 42, href: "https://number.example/" },
+		{ title: "Empty link", href: "  " },
+		{ title: "", href: "https://empty.example/" },
+	];
 
-	const results = parseDuckDuckGoHtml(html, 20);
+	const results = normalizeDuckDuckGoResults(rawResults, 20);
 
 	assert.deepEqual(results, [{ title: "First", url: "https://example.com/" }]);
 });

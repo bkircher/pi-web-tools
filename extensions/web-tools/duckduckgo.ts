@@ -1,4 +1,4 @@
-import { parse, type DefaultTreeAdapterTypes } from "parse5";
+import type { RawResult } from "./search-obscura.js";
 
 export type Result = {
 	title: string;
@@ -6,93 +6,35 @@ export type Result = {
 	snippet?: string;
 };
 
-type Node = DefaultTreeAdapterTypes.Node;
-type ParentNode = DefaultTreeAdapterTypes.ParentNode;
-type Element = DefaultTreeAdapterTypes.Element;
-type TextNode = DefaultTreeAdapterTypes.TextNode;
+const DUCKDUCKGO_ORIGIN = "https://html.duckduckgo.com";
 
-function isElement(node: Node): node is Element {
-	return "tagName" in node;
+function normalizeWhitespace(value: string): string {
+	return value.replace(/\s+/gu, " ").trim();
 }
 
-function isTextNode(node: Node): node is TextNode {
-	return !isElement(node) && node.nodeName === "#text";
+function isDuckDuckGoHost(hostname: string): boolean {
+	return hostname === "duckduckgo.com" || hostname.endsWith(".duckduckgo.com");
 }
 
-function getAttribute(element: Element, name: string): string | undefined {
-	return element.attrs.find((attribute) => attribute.name === name)?.value;
-}
+export function normalizeResultUrl(href: string): string | undefined {
+	const normalizedHref = href.trim();
+	if (!normalizedHref) return undefined;
 
-function hasClass(element: Element, className: string): boolean {
-	return getAttribute(element, "class")?.split(/\s+/u).includes(className) ?? false;
-}
-
-function pushChildrenInReverse(stack: Node[], node: ParentNode): void {
-	for (let index = node.childNodes.length - 1; index >= 0; index -= 1) {
-		stack.push(node.childNodes[index]);
-	}
-}
-
-function* walkNodes(root: ParentNode, shouldDescend?: (element: Element) => boolean): Generator<Node> {
-	const stack: Node[] = [];
-	pushChildrenInReverse(stack, root);
-
-	while (stack.length > 0) {
-		const node = stack.pop()!;
-		yield node;
-
-		if (isElement(node) && (shouldDescend?.(node) ?? true)) pushChildrenInReverse(stack, node);
-	}
-}
-
-function* walkElements(root: ParentNode): Generator<Element> {
-	for (const node of walkNodes(root)) {
-		if (isElement(node)) yield node;
-	}
-}
-
-function findFirstElement(root: ParentNode, predicate: (element: Element) => boolean): Element | undefined {
-	for (const element of walkElements(root)) {
-		if (predicate(element)) return element;
-	}
-	return undefined;
-}
-
-function findResultContainer(element: Element): Element | undefined {
-	let parent = element.parentNode;
-	while (parent) {
-		if (isElement(parent) && hasClass(parent, "result")) return parent;
-		parent = "parentNode" in parent ? parent.parentNode : null;
-	}
-	return undefined;
-}
-
-function textContent(root: ParentNode): string {
-	const parts: string[] = [];
-
-	for (const node of walkNodes(root, (element) => element.tagName !== "script" && element.tagName !== "style")) {
-		if (isTextNode(node)) parts.push(node.value);
-	}
-
-	return parts.join("").replace(/\s+/gu, " ").trim();
-}
-
-function unwrapUrl(href: string): string | undefined {
 	let url: URL;
 	try {
-		url = new URL(href, "https://html.duckduckgo.com");
+		url = new URL(normalizedHref, DUCKDUCKGO_ORIGIN);
 	} catch {
 		return undefined;
 	}
 
-	const isRedirect =
-		(url.hostname === "duckduckgo.com" || url.hostname.endsWith(".duckduckgo.com")) && url.pathname === "/l/";
-	const uddg = isRedirect ? url.searchParams.get("uddg") : undefined;
-	if (uddg) {
-		try {
-			url = new URL(uddg);
-		} catch {
-			return undefined;
+	if (isDuckDuckGoHost(url.hostname) && url.pathname === "/l/") {
+		const redirectUrl = url.searchParams.get("uddg");
+		if (redirectUrl) {
+			try {
+				url = new URL(redirectUrl);
+			} catch {
+				return undefined;
+			}
 		}
 	}
 
@@ -100,33 +42,28 @@ function unwrapUrl(href: string): string | undefined {
 	return url.href;
 }
 
-export function parseHtml(html: string, maxResults: number): Result[] {
-	if (maxResults <= 0) return [];
+export function normalizeResults(rawResults: RawResult[], maxResults: number): Result[] {
+	const limit = Number.isFinite(maxResults) ? Math.max(0, Math.floor(maxResults)) : 0;
+	if (limit === 0) return [];
 
-	const document = parse(html);
 	const results: Result[] = [];
 	const seen = new Set<string>();
 
-	for (const link of walkElements(document)) {
-		if (link.tagName !== "a" || !hasClass(link, "result__a")) continue;
-		const href = getAttribute(link, "href");
-		const url = href ? unwrapUrl(href) : undefined;
-		const title = textContent(link);
+	for (const rawResult of rawResults) {
+		if (typeof rawResult.title !== "string" || typeof rawResult.href !== "string") continue;
+
+		const title = normalizeWhitespace(rawResult.title);
+		const url = normalizeResultUrl(rawResult.href);
 		if (!title || !url || seen.has(url)) continue;
 
-		const container = findResultContainer(link);
-		const snippetElement = container
-			? findFirstElement(container, (element) => hasClass(element, "result__snippet"))
-			: undefined;
-		const snippet = snippetElement ? textContent(snippetElement) : undefined;
-
+		const snippet = typeof rawResult.snippet === "string" ? normalizeWhitespace(rawResult.snippet) : undefined;
 		seen.add(url);
 		results.push({
 			title,
 			url,
 			...(snippet ? { snippet } : {}),
 		});
-		if (results.length >= maxResults) break;
+		if (results.length >= limit) break;
 	}
 
 	return results;

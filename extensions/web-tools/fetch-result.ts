@@ -1,24 +1,7 @@
 import { formatSize, type AgentToolResult, type TruncationResult } from "@earendil-works/pi-coding-agent";
 import type { Details } from "./fetch-types.js";
 import type { Execution, Request } from "./obscura.js";
-import { formatTruncationNotice, limitText, type LimitedText } from "./output.js";
-
-function makePrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
-	let bytes = 0;
-	let endIndex = 0;
-
-	for (const char of content) {
-		const charBytes = Buffer.byteLength(char, "utf8");
-		if (bytes + charBytes > maxBytes) break;
-		bytes += charBytes;
-		endIndex += char.length;
-	}
-
-	return {
-		content: content.slice(0, endIndex),
-		bytes,
-	};
-}
+import { formatTruncationNotice, limitText, makePrefixPreview, type LimitedText } from "./output.js";
 
 function formatOutput(execution: Execution, stderr: string | undefined): LimitedText {
 	const { output } = execution;

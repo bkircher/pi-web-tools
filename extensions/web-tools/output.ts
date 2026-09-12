@@ -29,7 +29,7 @@ type Limits = {
 
 const OUTPUT_LIMIT_DESCRIPTION = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
 
-function makePrefixPreview(content: string, maxBytes: number): string {
+export function makePrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
 	let bytes = 0;
 	let endIndex = 0;
 
@@ -40,7 +40,10 @@ function makePrefixPreview(content: string, maxBytes: number): string {
 		endIndex += char.length;
 	}
 
-	return content.slice(0, endIndex);
+	return {
+		content: content.slice(0, endIndex),
+		bytes,
+	};
 }
 
 function countLines(content: string): number {
@@ -75,7 +78,7 @@ export function limitText(content: string, notice: string, limits: Limits = {}):
 	let preview = previewTruncation.content;
 
 	if (maxPreviewLines > 0 && previewTruncation.truncatedBy === "bytes") {
-		preview = makePrefixPreview(content, maxPreviewBytes).replace(/\n+$/u, "");
+		preview = makePrefixPreview(content, maxPreviewBytes).content.replace(/\n+$/u, "");
 	}
 
 	return {

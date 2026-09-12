@@ -1,5 +1,11 @@
 import { setTimeout as delay } from "node:timers/promises";
-import type { AgentToolResult, ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+	AgentToolResult,
+	AgentToolUpdateCallback,
+	ExtensionAPI,
+	ExtensionContext,
+	ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { MAX_RESULTS } from "./duckduckgo.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
@@ -64,7 +70,19 @@ const parameters = Type.Object({
 });
 
 export type SearchParameters = Static<typeof parameters>;
-export type SearchTool = ToolDefinition<typeof parameters, Details>;
+
+type SearchExecutionContext = Pick<ExtensionContext, "cwd">;
+type SearchToolDefinition = ToolDefinition<typeof parameters, Details>;
+
+export type SearchTool = Omit<SearchToolDefinition, "execute"> & {
+	execute(
+		toolCallId: string,
+		params: SearchParameters,
+		signal: AbortSignal | undefined,
+		onUpdate: AgentToolUpdateCallback<Details> | undefined,
+		context: SearchExecutionContext,
+	): Promise<AgentToolResult<Details>>;
+};
 
 type SearchExtensionAPI = Pick<ExtensionAPI, "exec"> & {
 	registerTool(tool: SearchTool): void;

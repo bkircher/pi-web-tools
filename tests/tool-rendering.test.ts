@@ -13,7 +13,7 @@ import type { Details as SearchDetails } from "../extensions/web-tools/search-ty
 const theme = {
 	fg: (_color: string, text: string) => text,
 	bold: (text: string) => text,
-} as Theme;
+} satisfies Pick<Theme, "fg" | "bold">;
 
 const renderContext = { isError: false };
 

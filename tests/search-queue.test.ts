@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Execution } from "../extensions/web-tools/obscura.ts";
 import { scan as scanOutput } from "../extensions/web-tools/output.ts";
 import { registerTool, type SearchTool } from "../extensions/web-tools/search.ts";
 import type { RunObscura } from "../extensions/web-tools/search-obscura.ts";
 
-const toolContext = { cwd: "/project" } as ExtensionContext;
+const toolContext = { cwd: "/project" } satisfies Parameters<SearchTool["execute"]>[4];
 
 function getSearchTool(runObscura: RunObscura): SearchTool {
 	let tool: SearchTool | undefined;

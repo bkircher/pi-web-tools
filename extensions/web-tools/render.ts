@@ -12,6 +12,7 @@ import type { SearchParameters } from "./search.js";
 import type { Details as SearchDetails } from "./search-types.js";
 
 type RenderContext = { isError: boolean };
+type RenderTheme = Pick<Theme, "fg" | "bold">;
 
 const UNSAFE_TERMINAL_PATTERN = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
 
@@ -37,7 +38,7 @@ function getResultText(result: AgentToolResult<unknown>): string {
 		.join("\n");
 }
 
-export function renderSearchCall(args: SearchParameters, theme: Theme): Text {
+export function renderSearchCall(args: SearchParameters, theme: RenderTheme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Search"));
 	const query = args.query?.trim();
 	if (!query) return new Text(title, 0, 0);
@@ -49,7 +50,7 @@ export function renderSearchCall(args: SearchParameters, theme: Theme): Text {
 export function renderSearchResult(
 	result: AgentToolResult<SearchDetails>,
 	{ expanded, isPartial }: ToolRenderResultOptions,
-	theme: Theme,
+	theme: RenderTheme,
 	context: RenderContext,
 ): Text {
 	if (isPartial) return new Text(theme.fg("warning", "Searching…"), 0, 0);
@@ -78,7 +79,7 @@ export function renderSearchResult(
 	return new Text(text, 0, 0);
 }
 
-export function renderFetchCall(args: FetchParameters, theme: Theme): Text {
+export function renderFetchCall(args: FetchParameters, theme: RenderTheme): Text {
 	const title = theme.fg("toolTitle", theme.bold("Web Fetch"));
 	return new Text(args.url ? `${title} ${theme.fg("accent", getDisplayUrl(args.url))}` : title, 0, 0);
 }
@@ -86,7 +87,7 @@ export function renderFetchCall(args: FetchParameters, theme: Theme): Text {
 export function renderFetchResult(
 	result: AgentToolResult<FetchDetails>,
 	{ expanded, isPartial }: ToolRenderResultOptions,
-	theme: Theme,
+	theme: RenderTheme,
 	context: RenderContext,
 ): Text {
 	if (isPartial) return new Text(theme.fg("warning", "Fetching…"), 0, 0);

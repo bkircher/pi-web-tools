@@ -61,13 +61,12 @@ export function createResult(request: Request, execution: Execution, elapsedMs: 
 	const { output } = execution;
 	const limitedStderr = execution.stderr ? limitText(execution.stderr, STDERR_TRUNCATION_NOTICE) : undefined;
 	const formattedOutput = formatOutput(execution, execution.stderr);
-	const effectiveTruncation: TruncationResult | undefined = formattedOutput.truncation.truncated
-		? formattedOutput.truncation
-		: output.truncated
-			? { ...output.truncation, truncated: true }
-			: limitedStderr?.truncation.truncated
-				? limitedStderr.truncation
-				: undefined;
+	let effectiveTruncation: TruncationResult | undefined;
+	if (formattedOutput.truncation.truncated) {
+		effectiveTruncation = formattedOutput.truncation;
+	} else if (output.truncated) {
+		effectiveTruncation = { ...output.truncation, truncated: true };
+	}
 	const outputDetails = effectiveTruncation
 		? {
 				truncated: true as const,

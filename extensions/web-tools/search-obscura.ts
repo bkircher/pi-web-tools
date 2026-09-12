@@ -1,4 +1,3 @@
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import {
 	calculateProcessTimeoutSeconds,
@@ -8,7 +7,7 @@ import {
 	type Execution,
 	type Request,
 } from "./obscura.js";
-import { limitText } from "./output.js";
+import { formatTruncationNotice, limitText } from "./output.js";
 import type { ResponseData, UntrustedResult } from "./search-types.js";
 
 type EvaluationData = {
@@ -21,9 +20,6 @@ export type RunObscura = typeof execute;
 
 const SEARCH_HOSTNAME = buildSearchUrl("").hostname;
 const SEARCH_NAVIGATION_TIMEOUT_SECONDS = 10;
-const OUTPUT_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
-const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} limit reached.]`;
-const FAILURE_TRUNCATION_NOTICE = `[DuckDuckGo search failure truncated: ${OUTPUT_LIMIT} limit reached.]`;
 
 const SEARCH_EVALUATION_SCRIPT = `(() => {
 	const challenge = Boolean(document.querySelector(
@@ -159,7 +155,7 @@ export async function searchDuckDuckGo(
 		}
 		const failure = limitText(
 			`DuckDuckGo search failed through Obscura: ${errorReason(error)}`,
-			FAILURE_TRUNCATION_NOTICE,
+			formatTruncationNotice("DuckDuckGo search failure"),
 		);
 		throw new Error(failure.text, { cause: error });
 	}
@@ -172,7 +168,9 @@ export async function searchDuckDuckGo(
 		throw new Error("DuckDuckGo blocked the search with an anti-bot challenge");
 	}
 
-	const stderr = execution.stderr ? limitText(execution.stderr, STDERR_TRUNCATION_NOTICE).text : undefined;
+	const stderr = execution.stderr
+		? limitText(execution.stderr, formatTruncationNotice("Obscura stderr")).text
+		: undefined;
 	return {
 		backend: "obscura",
 		searchUrl,

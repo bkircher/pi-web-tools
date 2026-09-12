@@ -1,13 +1,7 @@
-import {
-	DEFAULT_MAX_BYTES,
-	DEFAULT_MAX_LINES,
-	formatSize,
-	type AgentToolResult,
-	type TruncationResult,
-} from "@earendil-works/pi-coding-agent";
+import { formatSize, type AgentToolResult, type TruncationResult } from "@earendil-works/pi-coding-agent";
 import type { Details } from "./fetch-types.js";
 import type { Execution, Request } from "./obscura.js";
-import { limitText, type LimitedText } from "./output.js";
+import { formatTruncationNotice, limitText, type LimitedText } from "./output.js";
 
 function makePrefixPreview(content: string, maxBytes: number): { content: string; bytes: number } {
 	let bytes = 0;
@@ -25,9 +19,6 @@ function makePrefixPreview(content: string, maxBytes: number): { content: string
 		bytes,
 	};
 }
-
-const OUTPUT_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
-const STDERR_TRUNCATION_NOTICE = `[Obscura stderr truncated: ${OUTPUT_LIMIT} limit reached.]`;
 
 function formatOutput(execution: Execution, stderr: string | undefined): LimitedText {
 	const { output } = execution;
@@ -53,13 +44,15 @@ function formatOutput(execution: Execution, stderr: string | undefined): Limited
 	if (!text) text = "No content returned.";
 	if (stderr) text += `\n\n[Obscura stderr]\n${stderr}`;
 
-	const retainedOutput = output.truncated ? ` Full page output saved to: ${output.fullOutputPath}` : "";
-	return limitText(text, `[Tool output truncated: ${OUTPUT_LIMIT} limit reached.${retainedOutput}]`);
+	const retentionDetails = output.truncated ? `Full page output saved to: ${output.fullOutputPath}` : undefined;
+	return limitText(text, formatTruncationNotice("Tool output", retentionDetails));
 }
 
 export function createResult(request: Request, execution: Execution, elapsedMs: number): AgentToolResult<Details> {
 	const { output } = execution;
-	const limitedStderr = execution.stderr ? limitText(execution.stderr, STDERR_TRUNCATION_NOTICE) : undefined;
+	const limitedStderr = execution.stderr
+		? limitText(execution.stderr, formatTruncationNotice("Obscura stderr"))
+		: undefined;
 	const formattedOutput = formatOutput(execution, execution.stderr);
 	let effectiveTruncation: TruncationResult | undefined;
 	if (formattedOutput.truncation.truncated) {

@@ -1,6 +1,7 @@
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
+	formatSize,
 	type TruncationResult,
 	truncateHead,
 } from "@earendil-works/pi-coding-agent";
@@ -26,6 +27,8 @@ type Limits = {
 	maxLines?: number;
 };
 
+const OUTPUT_LIMIT_DESCRIPTION = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
+
 function makePrefixPreview(content: string, maxBytes: number): string {
 	let bytes = 0;
 	let endIndex = 0;
@@ -47,6 +50,11 @@ function countLines(content: string): number {
 		if (char === "\n") lines += 1;
 	}
 	return lines;
+}
+
+export function formatTruncationNotice(source: string, details?: string): string {
+	const additionalDetails = details ? ` ${details}` : "";
+	return `[${source} truncated: ${OUTPUT_LIMIT_DESCRIPTION} limit reached.${additionalDetails}]`;
 }
 
 /**

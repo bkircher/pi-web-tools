@@ -2,15 +2,16 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	DEFAULT_MAX_BYTES,
-	DEFAULT_MAX_LINES,
-	formatSize,
-	type ExecResult,
-	type ExtensionAPI,
-} from "@earendil-works/pi-coding-agent";
+import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "./fetch-types.js";
-import { limitText, scan, type CompleteScanResult, type ScanResult, type TruncatedScanResult } from "./output.js";
+import {
+	formatTruncationNotice,
+	limitText,
+	scan,
+	type CompleteScanResult,
+	type ScanResult,
+	type TruncatedScanResult,
+} from "./output.js";
 
 type RequestBase = {
 	url: string;
@@ -110,7 +111,6 @@ async function prepareOutput(scan: ScanResult, outputPath: string, storage: Stor
 	};
 }
 
-const DIAGNOSTIC_LIMIT = `${DEFAULT_MAX_LINES}-line or ${formatSize(DEFAULT_MAX_BYTES)}`;
 const OBSCURA_TIMEOUT_EXIT_CODE = 124;
 const PROCESS_TIMEOUT_GRACE_SECONDS = 10;
 
@@ -119,10 +119,6 @@ export function calculateProcessTimeoutSeconds(
 	postNavigationWaitSeconds: number,
 ): number {
 	return navigationTimeoutSeconds + postNavigationWaitSeconds + PROCESS_TIMEOUT_GRACE_SECONDS;
-}
-
-function limitDiagnostic(content: string, source: string) {
-	return limitText(content, `[${source} truncated: ${DIAGNOSTIC_LIMIT} limit reached.]`);
 }
 
 function createProcessTimeoutError(processTimeoutSeconds: number): ObscuraError {
@@ -147,7 +143,7 @@ function assertSucceeded(result: ExecResult, processTimeoutSeconds: number, sign
 		const stderr = result.stderr.trim();
 		const stdout = result.stdout.trim();
 		const message = `obscura fetch failed with exit code ${result.code}: ${stderr || stdout || "no error output"}`;
-		const limitedMessage = limitDiagnostic(message, "Obscura failure output");
+		const limitedMessage = limitText(message, formatTruncationNotice("Obscura failure output"));
 		throw new ObscuraError("command-failed", limitedMessage.text);
 	}
 }

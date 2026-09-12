@@ -1,5 +1,5 @@
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
-import { execute, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
+import { execute, ObscuraError, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
 import type { RawResult, ResponseData } from "./search-types.js";
 
 type EvaluationData = {
@@ -34,12 +34,6 @@ const SEARCH_EVALUATION_SCRIPT = `(() => {
 function errorReason(error: unknown): string {
 	if (error instanceof Error && error.message) return error.message;
 	return String(error);
-}
-
-function isTimeoutError(error: unknown): boolean {
-	if (error instanceof DOMException && error.name === "TimeoutError") return true;
-	if (error instanceof Error && error.name === "TimeoutError") return true;
-	return /\b(?:timed out|timeout)\b/iu.test(errorReason(error));
 }
 
 function throwObscuraFailure(reason: string): never {
@@ -143,10 +137,10 @@ export async function searchDuckDuckGo(
 			signal: options.signal,
 		});
 	} catch (error) {
-		if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+		if (options.signal?.aborted || (error instanceof ObscuraError && error.code === "cancelled")) {
 			throw new Error("DuckDuckGo search was cancelled", { cause: error });
 		}
-		if (isTimeoutError(error)) {
+		if (error instanceof ObscuraError && error.code === "timeout") {
 			throw new Error(`DuckDuckGo search timed out after ${SEARCH_TIMEOUT_SECONDS} seconds`, { cause: error });
 		}
 		throw new Error(`DuckDuckGo search failed through Obscura: ${errorReason(error)}`, { cause: error });

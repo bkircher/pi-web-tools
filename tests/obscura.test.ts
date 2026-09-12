@@ -138,6 +138,57 @@ test("deletes the working directory when Obscura fails", async () => {
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
-	await assert.rejects(result, { message: "obscura fetch failed with exit code 2: navigation failed" });
+	await assert.rejects(result, {
+		name: "ObscuraError",
+		code: "command-failed",
+		message: "obscura fetch failed with exit code 2: navigation failed",
+	});
 	assert.equal(removedWorkingDirectory, "/work");
+});
+
+test("reports a killed Obscura process as a typed timeout", async () => {
+	const storage: ObscuraStorage = {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw new Error("not used");
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => {},
+	};
+	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
+
+	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
+
+	await assert.rejects(result, {
+		name: "ObscuraError",
+		code: "timeout",
+		message: "obscura fetch timed out",
+	});
+});
+
+test("reports a killed Obscura process with an aborted signal as cancellation", async () => {
+	const controller = new AbortController();
+	controller.abort();
+	const storage: ObscuraStorage = {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw new Error("not used");
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => {},
+	};
+	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
+
+	const result = executeObscuraFetch(dumpRequest, {
+		exec,
+		cwd: "/project",
+		signal: controller.signal,
+		storage,
+	});
+
+	await assert.rejects(result, {
+		name: "ObscuraError",
+		code: "cancelled",
+		message: "obscura fetch was cancelled",
+	});
 });

@@ -30,6 +30,18 @@ export type Execution = {
 	stderr?: string;
 };
 
+export type ObscuraErrorCode = "cancelled" | "command-failed" | "timeout";
+
+export class ObscuraError extends Error {
+	constructor(
+		public readonly code: ObscuraErrorCode,
+		message: string,
+	) {
+		super(message);
+		this.name = "ObscuraError";
+	}
+}
+
 export type Exec = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
 
 export type Storage = {
@@ -118,14 +130,20 @@ async function prepareOutput(source: OutputSource, storage: Storage): Promise<Pr
 	};
 }
 
-function assertSucceeded(result: ExecResult): void {
+function assertSucceeded(result: ExecResult, signal?: AbortSignal): void {
 	if (result.killed) {
-		throw new Error("obscura fetch was cancelled or timed out");
+		if (signal?.aborted) {
+			throw new ObscuraError("cancelled", "obscura fetch was cancelled");
+		}
+		throw new ObscuraError("timeout", "obscura fetch timed out");
 	}
 	if (result.code !== 0) {
 		const stderr = result.stderr.trim();
 		const stdout = result.stdout.trim();
-		throw new Error(`obscura fetch failed with exit code ${result.code}: ${stderr || stdout || "no error output"}`);
+		throw new ObscuraError(
+			"command-failed",
+			`obscura fetch failed with exit code ${result.code}: ${stderr || stdout || "no error output"}`,
+		);
 	}
 }
 
@@ -141,7 +159,7 @@ export async function execute(request: Request, options: ExecuteOptions): Promis
 			signal: options.signal,
 			timeout: processTimeoutMs,
 		});
-		assertSucceeded(result);
+		assertSucceeded(result, options.signal);
 
 		const source = await getOutputSource(storage, outputPath, result.stdout);
 		const output = await prepareOutput(source, storage);

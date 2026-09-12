@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Exec } from "../extensions/web-tools/obscura.ts";
+import { ObscuraError, type Exec } from "../extensions/web-tools/obscura.ts";
 import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search-obscura.ts";
 import { scan as scanOutput } from "../extensions/web-tools/output.ts";
 
@@ -156,7 +156,7 @@ test("rejects invalid structured result fields", async () => {
 
 test("reports an Obscura timeout separately", async () => {
 	const runObscura: RunObscura = async () => {
-		throw new Error("obscura fetch was cancelled or timed out");
+		throw new ObscuraError("timeout", "obscura fetch timed out");
 	};
 
 	const result = searchDuckDuckGo("timeout test", {
@@ -166,6 +166,23 @@ test("reports an Obscura timeout separately", async () => {
 	});
 
 	await assert.rejects(result, { message: "DuckDuckGo search timed out after 10 seconds" });
+});
+
+test("does not infer a timeout from command failure text", async () => {
+	const runObscura: RunObscura = async () => {
+		throw new ObscuraError("command-failed", "obscura fetch failed with exit code 2: invalid timeout argument");
+	};
+
+	const result = searchDuckDuckGo("invalid timeout argument test", {
+		exec: unusedExec,
+		cwd: "/project",
+		runObscura,
+	});
+
+	await assert.rejects(result, {
+		message:
+			"DuckDuckGo search failed through Obscura: obscura fetch failed with exit code 2: invalid timeout argument",
+	});
 });
 
 test("reports cancellation separately", async () => {

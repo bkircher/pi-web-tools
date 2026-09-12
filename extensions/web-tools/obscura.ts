@@ -33,7 +33,7 @@ export type Execution = {
 	stderr?: string;
 };
 
-export type ObscuraErrorCode = "cancelled" | "command-failed" | "timeout";
+type ObscuraErrorCode = "cancelled" | "command-failed" | "timeout";
 
 export class ObscuraError extends Error {
 	constructor(

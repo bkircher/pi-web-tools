@@ -1,4 +1,4 @@
-import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { MAX_RESULTS } from "./duckduckgo.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
@@ -100,6 +100,11 @@ const parameters = Type.Object({
 });
 
 export type SearchParameters = Static<typeof parameters>;
+export type SearchTool = ToolDefinition<typeof parameters, Details>;
+
+type SearchExtensionAPI = Pick<ExtensionAPI, "exec"> & {
+	registerTool(tool: SearchTool): void;
+};
 
 function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -187,7 +192,7 @@ function formatResults(results: Result[]): string {
 /**
  * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
-export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
+export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions = {}): void {
 	const cache: SearchCache = new Map();
 
 	pi.registerTool({

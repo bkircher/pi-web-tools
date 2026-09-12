@@ -1,40 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-	AgentToolResult,
-	AgentToolUpdateCallback,
-	ExtensionAPI,
-	ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Execution } from "../extensions/web-tools/obscura.ts";
 import { scan as scanOutput } from "../extensions/web-tools/output.ts";
-import { registerTool, type SearchParameters } from "../extensions/web-tools/search.ts";
+import { registerTool, type SearchTool } from "../extensions/web-tools/search.ts";
 import type { RunObscura } from "../extensions/web-tools/search-obscura.ts";
-import type { Details } from "../extensions/web-tools/search-types.ts";
-
-type SearchTool = {
-	execute(
-		toolCallId: string,
-		params: SearchParameters,
-		signal: AbortSignal | undefined,
-		onUpdate: AgentToolUpdateCallback<Details> | undefined,
-		ctx: ExtensionContext,
-	): Promise<AgentToolResult<Details>>;
-};
 
 const toolContext = { cwd: "/project" } as ExtensionContext;
 
 function getSearchTool(runObscura: RunObscura): SearchTool {
 	let tool: SearchTool | undefined;
-	registerTool(
-		{
-			registerTool(definition: SearchTool) {
-				tool = definition;
-			},
-			exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }),
-		} as unknown as ExtensionAPI,
-		{ runObscura },
-	);
+	const pi = {
+		registerTool(definition: SearchTool) {
+			tool = definition;
+		},
+		exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }),
+	} satisfies Parameters<typeof registerTool>[0];
+	registerTool(pi, { runObscura });
 	assert.ok(tool);
 	return tool;
 }

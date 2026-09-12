@@ -19,6 +19,18 @@ const dumpRequest: ObscuraRequest = {
 	proxy: "socks5://proxy.example:1080",
 };
 
+function createStorage(overrides: Partial<ObscuraStorage> = {}): ObscuraStorage {
+	return {
+		createWorkingDirectory: async () => "/work",
+		readOutputFile: async () => {
+			throw new Error("not used");
+		},
+		retainOutput: async () => "/retained/output.txt",
+		removeWorkingDirectory: async () => undefined,
+		...overrides,
+	};
+}
+
 test("builds Obscura dump arguments", () => {
 	const outputPath = "/work/output.txt";
 
@@ -80,20 +92,18 @@ test("persists truncated stdout fallback output before deleting the working dire
 	const stdout = "a".repeat(51_201);
 	let retainedSource: ObscuraOutputSource["source"] | undefined;
 	let removedWorkingDirectory: string | undefined;
-	const storage: ObscuraStorage & { retainedOutputPath: string } = {
-		retainedOutputPath: "/retained/output.txt",
-		createWorkingDirectory: async () => "/work",
+	const storage = createStorage({
 		readOutputFile: async () => {
 			throw Object.assign(new Error("missing output file"), { code: "ENOENT" });
 		},
-		async retainOutput(source) {
+		retainOutput: async (source) => {
 			retainedSource = source.source;
-			return this.retainedOutputPath;
+			return "/retained/output.txt";
 		},
 		removeWorkingDirectory: async (path) => {
 			removedWorkingDirectory = path;
 		},
-	};
+	});
 	const exec = async () => ({ stdout, stderr: "", code: 0, killed: false });
 
 	const result = await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
@@ -107,14 +117,11 @@ test("persists truncated stdout fallback output before deleting the working dire
 
 test("propagates output file read errors instead of falling back to stdout", async () => {
 	const readError = Object.assign(new Error("permission denied"), { code: "EACCES" });
-	const storage: ObscuraStorage = {
-		createWorkingDirectory: async () => "/work",
+	const storage = createStorage({
 		readOutputFile: async () => {
 			throw readError;
 		},
-		retainOutput: async () => "/retained/output.txt",
-		removeWorkingDirectory: async () => {},
-	};
+	});
 	const exec = async () => ({ stdout: "fallback output", stderr: "", code: 0, killed: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
@@ -124,16 +131,11 @@ test("propagates output file read errors instead of falling back to stdout", asy
 
 test("deletes the working directory when Obscura fails", async () => {
 	let removedWorkingDirectory: string | undefined;
-	const storage: ObscuraStorage = {
-		createWorkingDirectory: async () => "/work",
-		readOutputFile: async () => {
-			throw new Error("not used");
-		},
-		retainOutput: async () => "/retained/output.txt",
+	const storage = createStorage({
 		removeWorkingDirectory: async (path) => {
 			removedWorkingDirectory = path;
 		},
-	};
+	});
 	const exec = async () => ({ stdout: "", stderr: "navigation failed", code: 2, killed: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
@@ -147,14 +149,7 @@ test("deletes the working directory when Obscura fails", async () => {
 });
 
 test("reports a killed Obscura process as a typed timeout", async () => {
-	const storage: ObscuraStorage = {
-		createWorkingDirectory: async () => "/work",
-		readOutputFile: async () => {
-			throw new Error("not used");
-		},
-		retainOutput: async () => "/retained/output.txt",
-		removeWorkingDirectory: async () => {},
-	};
+	const storage = createStorage();
 	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
@@ -169,14 +164,7 @@ test("reports a killed Obscura process as a typed timeout", async () => {
 test("reports a killed Obscura process with an aborted signal as cancellation", async () => {
 	const controller = new AbortController();
 	controller.abort();
-	const storage: ObscuraStorage = {
-		createWorkingDirectory: async () => "/work",
-		readOutputFile: async () => {
-			throw new Error("not used");
-		},
-		retainOutput: async () => "/retained/output.txt",
-		removeWorkingDirectory: async () => {},
-	};
+	const storage = createStorage();
 	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
 
 	const result = executeObscuraFetch(dumpRequest, {

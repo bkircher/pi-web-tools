@@ -1,4 +1,8 @@
-export type RawResult = {
+/**
+ * Untrusted data from DuckDuckGo. `href` can be relative, redirected, invalid,
+ * unsafe, or duplicated.
+ */
+export type UntrustedResult = {
 	title: string;
 	href: string;
 	snippet?: string;

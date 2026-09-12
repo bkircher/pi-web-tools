@@ -1,4 +1,4 @@
-import type { RawResult, Result } from "./search-types.js";
+import type { Result, UntrustedResult } from "./search-types.js";
 
 const DUCKDUCKGO_ORIGIN = "https://html.duckduckgo.com";
 const SEARCH_URL = `${DUCKDUCKGO_ORIGIN}/html/`;
@@ -47,7 +47,7 @@ export function normalizeResultUrl(href: string): string | undefined {
 	return url.href;
 }
 
-export function normalizeResults(rawResults: RawResult[], maxResults: number): Result[] {
+export function normalizeResults(rawResults: UntrustedResult[], maxResults: number): Result[] {
 	const limit = Number.isFinite(maxResults) ? Math.max(0, Math.floor(maxResults)) : 0;
 	if (limit === 0) return [];
 

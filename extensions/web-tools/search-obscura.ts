@@ -1,11 +1,11 @@
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import { execute, ObscuraError, type ExecuteOptions, type Execution, type Request } from "./obscura.js";
-import type { RawResult, ResponseData } from "./search-types.js";
+import type { ResponseData, UntrustedResult } from "./search-types.js";
 
 type EvaluationData = {
 	pageUrl: string;
 	challenge: boolean;
-	results: RawResult[];
+	results: UntrustedResult[];
 };
 
 export type RunObscura = (request: Request, options: ExecuteOptions) => Promise<Execution>;
@@ -67,7 +67,7 @@ function parseEvaluation(execution: Execution): EvaluationData {
 		return throwObscuraFailure("Obscura returned an invalid results field");
 	}
 
-	const results: RawResult[] = record.results.map((result) => {
+	const results: UntrustedResult[] = record.results.map((result) => {
 		if (typeof result !== "object" || result === null || Array.isArray(result)) {
 			return throwObscuraFailure("Obscura returned an invalid search result");
 		}

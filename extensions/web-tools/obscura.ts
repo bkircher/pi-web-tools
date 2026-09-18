@@ -19,6 +19,7 @@ type RequestBase = {
 	wait: number;
 	timeout: number;
 	proxy?: string;
+	verbose?: boolean;
 };
 
 export type Request = RequestBase &
@@ -87,7 +88,7 @@ const nodeStorage: Storage = {
 };
 
 export function buildArgs(request: Request, outputPath: string): string[] {
-	const args = ["fetch", "--quiet", "--stealth"];
+	const args = ["fetch", request.verbose ? "--verbose" : "--quiet", "--stealth"];
 	if (request.mode === "eval") {
 		args.push("--eval", request.script);
 	} else {

@@ -28,6 +28,7 @@ type ScheduledOperation<T> = { status: "complete"; value: T } | { status: "ready
 
 type SearchToolOptions = {
 	runObscura?: RunObscura;
+	diagnostics?: boolean;
 };
 
 const CACHE_TTL_MS = 2 * 60 * 1000;
@@ -196,6 +197,7 @@ function formatResults(results: Result[]): string {
  */
 export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions = {}): void {
 	const cache: SearchCache = new Map();
+	const diagnostics = options.diagnostics ?? process.env.PI_WEB_SEARCH_DIAGNOSTICS === "1";
 
 	pi.registerTool({
 		name: "web_search",
@@ -221,6 +223,7 @@ export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions 
 					cwd: ctx.cwd,
 					signal,
 					runObscura: options.runObscura,
+					diagnostics,
 				}),
 			);
 			const results = response.results.slice(0, limit);

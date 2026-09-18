@@ -89,6 +89,37 @@ test("builds Obscura eval arguments without dump-only options", () => {
 	]);
 });
 
+test("enables verbose logging only when requested", () => {
+	const request: ObscuraRequest = {
+		mode: "eval",
+		script: "document.title",
+		url: "https://example.com/",
+		waitUntil: "domcontentloaded",
+		wait: 0,
+		timeout: 10,
+		verbose: true,
+	};
+
+	const result = buildObscuraArgs(request, "/work/output.txt");
+
+	assert.deepEqual(result, [
+		"fetch",
+		"--verbose",
+		"--stealth",
+		"--eval",
+		"document.title",
+		"--wait-until",
+		"domcontentloaded",
+		"--wait",
+		"0",
+		"--timeout",
+		"10",
+		"--output",
+		"/work/output.txt",
+		"https://example.com/",
+	]);
+});
+
 test("retains a truncated output file before deleting the working directory", async () => {
 	const scan = await scanOutput([Buffer.from("a".repeat(51_201))]);
 	let retainedOutputPath: string | undefined;

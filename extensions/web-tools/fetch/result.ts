@@ -1,7 +1,7 @@
 import { formatSize, type AgentToolResult, type TruncationResult } from "@earendil-works/pi-coding-agent";
-import type { Details } from "./fetch-types.js";
-import type { Execution, Request } from "./obscura.js";
-import { formatTruncationNotice, limitText, makePrefixPreview, type LimitedText } from "./output.js";
+import type { Execution, Request } from "../shared/obscura.js";
+import { formatTruncationNotice, limitText, makePrefixPreview, type LimitedText } from "../shared/output.js";
+import type { Details } from "./types.js";
 
 function formatOutput(execution: Execution, stderr: string | undefined): LimitedText {
 	const { output } = execution;

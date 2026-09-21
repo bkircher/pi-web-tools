@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { runInNewContext } from "node:vm";
-import type { Exec, Execution } from "../extensions/web-tools/obscura.ts";
-import { scan } from "../extensions/web-tools/output.ts";
-import { registerTool, type SearchTool } from "../extensions/web-tools/search.ts";
-import type { DiagnosticStorage } from "../extensions/web-tools/search-diagnostics.ts";
-import { buildSearchEvaluationScript } from "../extensions/web-tools/search-evaluation.ts";
-import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search-obscura.ts";
+import type { Exec, Execution } from "../extensions/web-tools/shared/obscura.ts";
+import { scan } from "../extensions/web-tools/shared/output.ts";
+import { registerTool, type SearchTool } from "../extensions/web-tools/search/tool.ts";
+import type { DiagnosticStorage } from "../extensions/web-tools/search/diagnostics.ts";
+import { buildSearchEvaluationScript } from "../extensions/web-tools/search/evaluation.ts";
+import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search/execute.ts";
 
 const pageUrl = "https://html.duckduckgo.com/html/?q=example";
 const challengeMessage = "DuckDuckGo blocked the search with an anti-bot challenge";

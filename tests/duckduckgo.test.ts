@@ -3,7 +3,7 @@ import test from "node:test";
 import {
 	normalizeResults as normalizeDuckDuckGoResults,
 	normalizeResultUrl,
-} from "../extensions/web-tools/duckduckgo.ts";
+} from "../extensions/web-tools/search/duckduckgo.ts";
 
 test("normalizes result text and DuckDuckGo redirect URLs", () => {
 	const rawResults = [

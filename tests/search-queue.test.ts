@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Execution } from "../extensions/web-tools/obscura.ts";
-import { scan as scanOutput } from "../extensions/web-tools/output.ts";
-import { registerTool, type SearchTool } from "../extensions/web-tools/search.ts";
-import type { RunObscura } from "../extensions/web-tools/search-obscura.ts";
+import type { Execution } from "../extensions/web-tools/shared/obscura.ts";
+import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
+import { registerTool, type SearchTool } from "../extensions/web-tools/search/tool.ts";
+import type { RunObscura } from "../extensions/web-tools/search/execute.ts";
 
 const toolContext = { cwd: "/project" } satisfies Parameters<SearchTool["execute"]>[4];
 

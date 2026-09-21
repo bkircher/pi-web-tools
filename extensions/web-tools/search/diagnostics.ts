@@ -1,9 +1,9 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecuteOptions, Request } from "./obscura.js";
-import { formatTruncationNotice, limitText } from "./output.js";
-import { CHALLENGE_SELECTORS, DIAGNOSTIC_CHARACTER_BUDGET } from "./search-evaluation.js";
+import type { ExecuteOptions, Request } from "../shared/obscura.js";
+import { formatTruncationNotice, limitText } from "../shared/output.js";
+import { CHALLENGE_SELECTORS, DIAGNOSTIC_CHARACTER_BUDGET } from "./evaluation.js";
 
 type Sample = { text: string; truncated: boolean };
 

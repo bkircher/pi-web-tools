@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeUrl, type Resolver } from "../extensions/web-tools/fetch-url-policy.ts";
+import { normalizeUrl, type Resolver } from "../extensions/web-tools/fetch/url-policy.ts";
 
 const resolvePublicHost: Resolver = async () => [{ address: "93.184.216.34" }];
 

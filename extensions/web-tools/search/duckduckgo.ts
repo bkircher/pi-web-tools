@@ -1,4 +1,4 @@
-import type { Result, UntrustedResult } from "./search-types.js";
+import type { Result, UntrustedResult } from "./types.js";
 
 const DUCKDUCKGO_ORIGIN = "https://html.duckduckgo.com";
 const SEARCH_URL = `${DUCKDUCKGO_ORIGIN}/html/`;

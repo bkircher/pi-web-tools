@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AgentToolResult, Theme } from "@earendil-works/pi-coding-agent";
-import type { Details as WebFetchDetails } from "../extensions/web-tools/fetch-types.ts";
 import {
 	renderFetchCall as renderWebFetchCall,
 	renderFetchResult as renderWebFetchResult,
+} from "../extensions/web-tools/fetch/render.ts";
+import type { Details as WebFetchDetails } from "../extensions/web-tools/fetch/types.ts";
+import {
 	renderSearchCall as renderWebSearchCall,
 	renderSearchResult as renderWebSearchResult,
-} from "../extensions/web-tools/render.ts";
-import type { Details as SearchDetails } from "../extensions/web-tools/search-types.ts";
+} from "../extensions/web-tools/search/render.ts";
+import type { Details as SearchDetails } from "../extensions/web-tools/search/types.ts";
 
 const theme = {
 	fg: (_color: string, text: string) => text,

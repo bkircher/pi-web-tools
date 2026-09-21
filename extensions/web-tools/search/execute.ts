@@ -1,4 +1,3 @@
-import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
 import {
 	calculateProcessTimeoutSeconds,
 	execute,
@@ -6,11 +5,12 @@ import {
 	type ExecuteOptions,
 	type Execution,
 	type Request,
-} from "./obscura.js";
-import { formatTruncationNotice, limitText } from "./output.js";
-import { saveChallengeReport, type DiagnosticStorage } from "./search-diagnostics.js";
-import { buildSearchEvaluationScript } from "./search-evaluation.js";
-import type { ResponseData, UntrustedResult } from "./search-types.js";
+} from "../shared/obscura.js";
+import { formatTruncationNotice, limitText } from "../shared/output.js";
+import { saveChallengeReport, type DiagnosticStorage } from "./diagnostics.js";
+import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
+import { buildSearchEvaluationScript } from "./evaluation.js";
+import type { ResponseData, UntrustedResult } from "./types.js";
 
 type EvaluationData = {
 	pageUrl: string;

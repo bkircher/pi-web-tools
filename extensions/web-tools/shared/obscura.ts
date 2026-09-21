@@ -3,7 +3,6 @@ import { mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { DumpMode, WaitUntil } from "./fetch-types.js";
 import {
 	formatTruncationNotice,
 	limitText,
@@ -12,6 +11,12 @@ import {
 	type ScanResult,
 	type TruncatedScanResult,
 } from "./output.js";
+
+export const DUMP_MODES = ["markdown", "text", "html", "links", "assets"] as const;
+export const WAIT_UNTIL = ["load", "domcontentloaded", "networkidle0", "networkidle2"] as const;
+
+export type DumpMode = (typeof DUMP_MODES)[number];
+export type WaitUntil = (typeof WAIT_UNTIL)[number];
 
 type RequestBase = {
 	url: string;

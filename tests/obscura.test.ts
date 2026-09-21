@@ -6,8 +6,8 @@ import {
 	type Exec as ObscuraExec,
 	type Request as ObscuraRequest,
 	type Storage as ObscuraStorage,
-} from "../extensions/web-tools/obscura.ts";
-import { scan as scanOutput } from "../extensions/web-tools/output.ts";
+} from "../extensions/web-tools/shared/obscura.ts";
+import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
 
 const dumpRequest: ObscuraRequest = {
 	mode: "dump",

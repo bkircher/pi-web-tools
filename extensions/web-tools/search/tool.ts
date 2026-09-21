@@ -6,11 +6,10 @@ import type {
 	ExtensionContext,
 	ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type, type Static } from "typebox";
-import { MAX_RESULTS } from "./duckduckgo.js";
+import { searchDuckDuckGo, type RunObscura } from "./execute.js";
+import { parameters, type SearchParameters } from "./parameters.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
-import { searchDuckDuckGo, type RunObscura } from "./search-obscura.js";
-import type { Details, ResponseData, Result } from "./search-types.js";
+import type { Details, ResponseData, Result } from "./types.js";
 
 type CacheEntry = {
 	expiresAt: number;
@@ -33,7 +32,6 @@ type SearchToolOptions = {
 
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
-const MAX_QUERY_LENGTH = 500;
 const MIN_QUEUED_SEARCH_INTERVAL_MS = 1000;
 
 function createCancellationError(): Error {
@@ -60,23 +58,6 @@ function raceWithCancellation<T>(operation: Promise<T>, signal: AbortSignal | un
 let searchQueue: Promise<void> = Promise.resolve();
 let activeOrQueuedSearches = 0;
 let lastSearchStartedAt = 0;
-
-const parameters = Type.Object({
-	query: Type.String({
-		description: "Search query to send to DuckDuckGo HTML search",
-		minLength: 1,
-		maxLength: MAX_QUERY_LENGTH,
-	}),
-	limit: Type.Optional(
-		Type.Integer({
-			description: `Maximum number of search results to return (1-${MAX_RESULTS}, default 10)`,
-			minimum: 1,
-			maximum: MAX_RESULTS,
-		}),
-	),
-});
-
-export type SearchParameters = Static<typeof parameters>;
 
 type SearchExecutionContext = Pick<ExtensionContext, "cwd">;
 type SearchToolDefinition = ToolDefinition<typeof parameters, Details>;

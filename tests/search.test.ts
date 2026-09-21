@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ObscuraError, type Exec } from "../extensions/web-tools/obscura.ts";
-import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search-obscura.ts";
-import { scan as scanOutput } from "../extensions/web-tools/output.ts";
+import { ObscuraError, type Exec } from "../extensions/web-tools/shared/obscura.ts";
+import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search/execute.ts";
+import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
 
 const unusedExec: Exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
 

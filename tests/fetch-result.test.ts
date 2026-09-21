@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createResult as createWebFetchResult } from "../extensions/web-tools/fetch-result.ts";
-import type { Request as ObscuraRequest } from "../extensions/web-tools/obscura.ts";
-import { scan as scanOutput } from "../extensions/web-tools/output.ts";
+import { createResult as createWebFetchResult } from "../extensions/web-tools/fetch/result.ts";
+import type { Request as ObscuraRequest } from "../extensions/web-tools/shared/obscura.ts";
+import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
 
 const request: ObscuraRequest = {
 	mode: "dump",

@@ -179,7 +179,7 @@ export async function searchDuckDuckGo(
 		backend: "obscura",
 		searchUrl,
 		bytes: execution.output.truncation.totalBytes,
-		results: normalizeResults(evaluation.results, MAX_RESULTS),
+		results: normalizeResults(evaluation.results),
 		...(stderr ? { stderr } : {}),
 	};
 }

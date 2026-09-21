@@ -6,7 +6,7 @@ AGENTS.md
     under `~/src/obscura`. Feel free to consult them if needed.
  -  Before running any `npm` command, run `source ~/.nvm/nvm.sh && nvm use` to
     load the correct Node.js version.
- -  Verify changes by running `npm run typecheck` and `npm run lint`.
+ -  Verify changes by running `npm run typecheck`, `npm run lint`, and `npm test`.
  -  Make sure code is formatted with `npm run format`.
  -  When `npm audit` identifies a fix blocked by `min-release-age`, do not
     modify `package.json`. Do not attempt `--before` overrides or

@@ -47,10 +47,7 @@ export function normalizeResultUrl(href: string): string | undefined {
 	return url.href;
 }
 
-export function normalizeResults(rawResults: UntrustedResult[], maxResults: number): Result[] {
-	const limit = Number.isFinite(maxResults) ? Math.max(0, Math.floor(maxResults)) : 0;
-	if (limit === 0) return [];
-
+export function normalizeResults(rawResults: UntrustedResult[]): Result[] {
 	const results: Result[] = [];
 	const seen = new Set<string>();
 
@@ -66,7 +63,6 @@ export function normalizeResults(rawResults: UntrustedResult[], maxResults: numb
 			url,
 			...(snippet ? { snippet } : {}),
 		});
-		if (results.length >= limit) break;
 	}
 
 	return results;

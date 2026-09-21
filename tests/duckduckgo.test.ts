@@ -14,7 +14,7 @@ test("normalizes result text and DuckDuckGo redirect URLs", () => {
 		},
 	];
 
-	const results = normalizeDuckDuckGoResults(rawResults, 20);
+	const results = normalizeDuckDuckGoResults(rawResults);
 
 	assert.deepEqual(results, [
 		{
@@ -41,21 +41,6 @@ test("does not unwrap DuckDuckGo links outside the redirect path", () => {
 	assert.equal(result, "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F");
 });
 
-test("stops collecting results at the requested limit", () => {
-	const rawResults = [
-		{ title: "One", href: "https://one.example/" },
-		{ title: "Two", href: "https://two.example/" },
-		{ title: "Three", href: "https://three.example/" },
-	];
-
-	const results = normalizeDuckDuckGoResults(rawResults, 2);
-
-	assert.deepEqual(results, [
-		{ title: "One", url: "https://one.example/" },
-		{ title: "Two", url: "https://two.example/" },
-	]);
-});
-
 test("omits duplicate, unsafe, and empty results", () => {
 	const rawResults = [
 		{ title: "First", href: "https://example.com/" },
@@ -66,7 +51,7 @@ test("omits duplicate, unsafe, and empty results", () => {
 		{ title: "", href: "https://empty.example/" },
 	];
 
-	const results = normalizeDuckDuckGoResults(rawResults, 20);
+	const results = normalizeDuckDuckGoResults(rawResults);
 
 	assert.deepEqual(results, [{ title: "First", url: "https://example.com/" }]);
 });

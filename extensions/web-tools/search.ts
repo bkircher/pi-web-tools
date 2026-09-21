@@ -204,7 +204,7 @@ export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions 
 		label: "Web Search",
 		description:
 			"Search the web using DuckDuckGo HTML search through Obscura. Returns result titles, URLs, and snippets; does not fetch result pages.",
-		promptSnippet: "Search the web with DuckDuckGo through Obscura and return titles, URLs, and snippets.",
+		promptSnippet: "Search the web with DuckDuckGo and return titles, URLs, and snippets.",
 		promptGuidelines: [
 			"Use web_search when the user asks for current or external web information that is not available in the repository.",
 			"When using web_search results in an answer, cite the relevant result URLs.",

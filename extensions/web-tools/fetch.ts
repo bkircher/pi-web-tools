@@ -98,9 +98,9 @@ export function registerTool(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "web_fetch",
 		label: "Web Fetch",
-		description: `Fetch a specific public HTTP(S) URL with Obscura. Obscura stealth mode is always enabled. Defaults to Markdown output and a ${DEFAULT_WAIT_SECONDS}-second post-navigation settle wait. Page content and Obscura diagnostics are limited together to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first); truncated page content is saved to a temp file. Binary/raw responses are intentionally not supported by this tool.`,
+		description: `Fetch a specific public URL with Obscura. Obscura stealth mode is always enabled. Defaults to Markdown output and a ${DEFAULT_WAIT_SECONDS}-second post-navigation settle wait. Page content and Obscura diagnostics are limited together to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first); truncated page content is saved to a temp file. Binary/raw responses are intentionally not supported by this tool.`,
 		promptSnippet:
-			"Fetch a specific public URL with Obscura stealth mode and return markdown, text, HTML, links, assets, or JavaScript evaluation output.",
+			"Fetch a specific public URL and return Markdown, text, HTML, links, assets, or JavaScript evaluation output.",
 		promptGuidelines: [
 			"Use web_fetch when the user asks to read, summarize, or extract content from a specific public URL.",
 			"Use web_search for discovery; use web_fetch only after you have a concrete URL.",

@@ -1,8 +1,6 @@
 import type { TruncationResult } from "@earendil-works/pi-coding-agent";
 import type { DumpMode, WaitUntil } from "../shared/obscura.js";
 
-export type { DumpMode, WaitUntil } from "../shared/obscura.js";
-
 export type Details = {
 	url: string;
 	waitUntil: WaitUntil;

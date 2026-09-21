@@ -1,6 +1,8 @@
 import { Type, type Static } from "typebox";
 import { MAX_RESULTS } from "./duckduckgo.js";
 
+export const DEFAULT_RESULT_LIMIT = 10;
+
 const MAX_QUERY_LENGTH = 500;
 
 export const parameters = Type.Object({
@@ -11,9 +13,10 @@ export const parameters = Type.Object({
 	}),
 	limit: Type.Optional(
 		Type.Integer({
-			description: `Maximum number of search results to return (1-${MAX_RESULTS}, default 10)`,
+			description: `Maximum number of search results to return (1-${MAX_RESULTS}, default ${DEFAULT_RESULT_LIMIT})`,
 			minimum: 1,
 			maximum: MAX_RESULTS,
+			default: DEFAULT_RESULT_LIMIT,
 		}),
 	),
 });

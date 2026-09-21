@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import type { AgentToolResult, ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { searchDuckDuckGo, type RunObscura } from "./execute.js";
-import { parameters } from "./parameters.js";
+import { DEFAULT_RESULT_LIMIT, parameters } from "./parameters.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
 import type { Details, ResponseData, Result } from "./types.js";
 
@@ -174,7 +174,7 @@ export function createSearchTool(
 
 		async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<Details>> {
 			const query = params.query.trim();
-			const limit = params.limit ?? 10;
+			const limit = params.limit ?? DEFAULT_RESULT_LIMIT;
 			if (!query) throw new Error("Search query must not be empty");
 
 			const startedAt = Date.now();

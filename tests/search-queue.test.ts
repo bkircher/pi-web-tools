@@ -1,23 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Execution } from "../extensions/web-tools/shared/obscura.ts";
 import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
-import { registerTool, type SearchTool } from "../extensions/web-tools/search/tool.ts";
+import { createSearchTool } from "../extensions/web-tools/search/tool.ts";
 import type { RunObscura } from "../extensions/web-tools/search/execute.ts";
 
-const toolContext = { cwd: "/project" } satisfies Parameters<SearchTool["execute"]>[4];
+const toolContext = { cwd: "/project" } as ExtensionContext;
 
-function getSearchTool(runObscura: RunObscura): SearchTool {
-	let tool: SearchTool | undefined;
-	const pi = {
-		registerTool(definition: SearchTool) {
-			tool = definition;
-		},
-		exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }),
-	} satisfies Parameters<typeof registerTool>[0];
-	registerTool(pi, { runObscura });
-	assert.ok(tool);
-	return tool;
+function getSearchTool(runObscura: RunObscura) {
+	return createSearchTool({ exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }) }, { runObscura });
 }
 
 async function createExecution(title = "Example", href = "https://example.com/"): Promise<Execution> {

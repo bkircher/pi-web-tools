@@ -1,13 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
-import type {
-	AgentToolResult,
-	AgentToolUpdateCallback,
-	ExtensionAPI,
-	ExtensionContext,
-	ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { searchDuckDuckGo, type RunObscura } from "./execute.js";
-import { parameters, type SearchParameters } from "./parameters.js";
+import { parameters } from "./parameters.js";
 import { renderSearchCall, renderSearchResult } from "./render.js";
 import type { Details, ResponseData, Result } from "./types.js";
 
@@ -58,23 +52,6 @@ function raceWithCancellation<T>(operation: Promise<T>, signal: AbortSignal | un
 let searchQueue: Promise<void> = Promise.resolve();
 let activeOrQueuedSearches = 0;
 let lastSearchStartedAt = 0;
-
-type SearchExecutionContext = Pick<ExtensionContext, "cwd">;
-type SearchToolDefinition = ToolDefinition<typeof parameters, Details>;
-
-export type SearchTool = Omit<SearchToolDefinition, "execute"> & {
-	execute(
-		toolCallId: string,
-		params: SearchParameters,
-		signal: AbortSignal | undefined,
-		onUpdate: AgentToolUpdateCallback<Details> | undefined,
-		context: SearchExecutionContext,
-	): Promise<AgentToolResult<Details>>;
-};
-
-type SearchExtensionAPI = Pick<ExtensionAPI, "exec"> & {
-	registerTool(tool: SearchTool): void;
-};
 
 function cacheKey(query: string): string {
 	return query.trim().replace(/\s+/g, " ").toLowerCase();
@@ -174,13 +151,16 @@ function formatResults(results: Result[]): string {
 }
 
 /**
- * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
+ * Create the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
-export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions = {}): void {
+export function createSearchTool(
+	pi: Pick<ExtensionAPI, "exec">,
+	options: SearchToolOptions = {},
+): ToolDefinition<typeof parameters, Details> {
 	const cache: SearchCache = new Map();
 	const diagnostics = options.diagnostics ?? process.env.PI_WEB_SEARCH_DIAGNOSTICS === "1";
 
-	pi.registerTool({
+	return {
 		name: "web_search",
 		label: "Web Search",
 		description:
@@ -232,5 +212,12 @@ export function registerTool(pi: SearchExtensionAPI, options: SearchToolOptions 
 
 		renderCall: renderSearchCall,
 		renderResult: renderSearchResult,
-	});
+	};
+}
+
+/**
+ * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
+ */
+export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
+	pi.registerTool(createSearchTool(pi, options));
 }

@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerTool as registerFetchTool } from "./fetch/tool.js";
-import { registerTool as registerSearchTool } from "./search/tool.js";
+import { createSearchTool, registerTool as registerSearchTool } from "./search/tool.js";
 
-export { registerFetchTool, registerSearchTool };
+export { createSearchTool, registerFetchTool, registerSearchTool };
 
 /** Details returned by the `web_search` tool. */
 export type { SearchParameters } from "./search/parameters.js";

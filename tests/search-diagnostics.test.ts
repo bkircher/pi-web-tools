@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { runInNewContext } from "node:vm";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Exec, Execution } from "../extensions/web-tools/shared/obscura.ts";
 import { scan } from "../extensions/web-tools/shared/output.ts";
-import { registerTool, type SearchTool } from "../extensions/web-tools/search/tool.ts";
+import { createSearchTool } from "../extensions/web-tools/search/tool.ts";
 import type { DiagnosticStorage } from "../extensions/web-tools/search/diagnostics.ts";
 import { buildSearchEvaluationScript } from "../extensions/web-tools/search/evaluation.ts";
 import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search/execute.ts";
 
 const pageUrl = "https://html.duckduckgo.com/html/?q=example";
 const challengeMessage = "DuckDuckGo blocked the search with an anti-bot challenge";
+const toolContext = { cwd: "/project" } as ExtensionContext;
 const combinedSelector =
 	"#challenge-form, .anomaly-modal__modal, .anomaly-modal__challenge, form[action*='anomaly.js']";
 const element = { outerHTML: '<form id="challenge-form">Verify this search</form>' };
@@ -306,27 +308,16 @@ test("bounds version output in the report", async (context) => {
 	assert.match(version, /\[Version output truncated\.\]$/u);
 });
 
-function registerSearch(runObscura: RunObscura): SearchTool {
-	let tool: SearchTool | undefined;
-	registerTool(
-		{
-			registerTool(definition) {
-				tool = definition;
-			},
-			exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }),
-		},
-		{ runObscura },
-	);
-	assert.ok(tool);
-	return tool;
+function createSearch(runObscura: RunObscura) {
+	return createSearchTool({ exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }) }, { runObscura });
 }
 
 test("web_search enables diagnostics when the environment setting is 1", async (context) => {
 	context.mock.property(process, "env", { PI_WEB_SEARCH_DIAGNOSTICS: "1" });
 	const { runObscura } = setup(context, page(new Map()));
-	const tool = registerSearch(runObscura);
+	const tool = createSearch(runObscura);
 
-	await tool.execute("search", { query: "enabled diagnostics" }, undefined, undefined, { cwd: "/project" });
+	await tool.execute("search", { query: "enabled diagnostics" }, undefined, undefined, toolContext);
 
 	assert.equal(runObscura.mock.calls[0].arguments[0].verbose, true);
 });
@@ -334,9 +325,9 @@ test("web_search enables diagnostics when the environment setting is 1", async (
 test("web_search leaves diagnostics disabled when the environment setting is absent", async (context) => {
 	context.mock.property(process, "env", {});
 	const { runObscura } = setup(context, page(new Map()));
-	const tool = registerSearch(runObscura);
+	const tool = createSearch(runObscura);
 
-	await tool.execute("search", { query: "default diagnostics" }, undefined, undefined, { cwd: "/project" });
+	await tool.execute("search", { query: "default diagnostics" }, undefined, undefined, toolContext);
 
 	assert.equal(runObscura.mock.calls[0].arguments[0].verbose, undefined);
 });
@@ -344,9 +335,9 @@ test("web_search leaves diagnostics disabled when the environment setting is abs
 test("web_search leaves diagnostics disabled for other setting values", async (context) => {
 	context.mock.property(process, "env", { PI_WEB_SEARCH_DIAGNOSTICS: "true" });
 	const { runObscura } = setup(context, page(new Map()));
-	const tool = registerSearch(runObscura);
+	const tool = createSearch(runObscura);
 
-	await tool.execute("search", { query: "other diagnostics value" }, undefined, undefined, { cwd: "/project" });
+	await tool.execute("search", { query: "other diagnostics value" }, undefined, undefined, toolContext);
 
 	assert.equal(runObscura.mock.calls[0].arguments[0].verbose, undefined);
 });

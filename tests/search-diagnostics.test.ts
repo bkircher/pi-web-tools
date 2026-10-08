@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { runInNewContext } from "node:vm";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import type { Exec, Execution } from "../extensions/web-tools/shared/obscura.ts";
 import { scan } from "../extensions/web-tools/shared/output.ts";
 import { createSearchTool } from "../extensions/web-tools/search/tool.ts";
@@ -11,7 +11,7 @@ import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/searc
 
 const pageUrl = "https://html.duckduckgo.com/html/?q=example";
 const challengeMessage = "DuckDuckGo blocked the search with an anti-bot challenge";
-const toolContext = { cwd: "/project" } as ExtensionContext;
+const toolContext = { cwd: "/project" } as ExtensionToolContext;
 const combinedSelector =
 	"#challenge-form, .anomaly-modal__modal, .anomaly-modal__challenge, form[action*='anomaly.js']";
 const element = { outerHTML: '<form id="challenge-form">Verify this search</form>' };

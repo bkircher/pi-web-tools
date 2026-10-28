@@ -1,23 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeUrl, type Resolver } from "../extensions/web-tools/fetch/url-policy.ts";
+import { normalizeUrl } from "../extensions/web-tools/fetch/url-policy.ts";
 
-const resolvePublicHost: Resolver = async () => [{ address: "93.184.216.34" }];
-
-test("normalizes public HTTP URLs", async () => {
+test("normalizes public HTTPS URLs", () => {
 	const input = "https://Example.COM:443/docs?q=public#section";
 
-	const result = await normalizeUrl(input, resolvePublicHost);
+	const result = normalizeUrl(input);
 
 	assert.equal(result, "https://example.com/docs?q=public#section");
 });
 
-test("rejects URL credentials", async () => {
+test("rejects URL credentials", () => {
 	const input = "https://user:password@example.com/docs";
 
-	const result = normalizeUrl(input, resolvePublicHost);
+	const normalize = () => normalizeUrl(input);
 
-	await assert.rejects(result, { message: "web_fetch URL must not include username or password credentials" });
+	assert.throws(normalize, { message: "web_fetch URL must not include username or password credentials" });
 });
 
 const sensitiveUrlCases = [
@@ -79,10 +77,10 @@ const sensitiveUrlCases = [
 ] as const;
 
 for (const { name, input, expectedMessage } of sensitiveUrlCases) {
-	test(`rejects ${name}`, async () => {
-		const result = normalizeUrl(input, resolvePublicHost);
+	test(`rejects ${name}`, () => {
+		const normalize = () => normalizeUrl(input);
 
-		await assert.rejects(result, { message: expectedMessage });
+		assert.throws(normalize, { message: expectedMessage });
 	});
 }
 
@@ -102,63 +100,81 @@ const allowedSensitiveLookingUrlCases = [
 ] as const;
 
 for (const { name, input } of allowedSensitiveLookingUrlCases) {
-	test(`allows ${name}`, async () => {
-		const result = await normalizeUrl(input, resolvePublicHost);
+	test(`allows ${name}`, () => {
+		const result = normalizeUrl(input);
 
 		assert.equal(result, input);
 	});
 }
 
-test("rejects special-use hostnames before DNS resolution", async () => {
+test("rejects malformed URLs", () => {
+	const input = "not a URL";
+
+	const normalize = () => normalizeUrl(input);
+
+	assert.throws(normalize, { message: "Invalid URL" });
+});
+
+test("rejects file URLs", () => {
+	const input = "file:///Users/example/notes.txt";
+
+	const normalize = () => normalizeUrl(input);
+
+	assert.throws(normalize, { message: "web_fetch only supports http:// and https:// URLs" });
+});
+
+test("rejects FTP URLs", () => {
+	const input = "ftp://example.com/docs";
+
+	const normalize = () => normalizeUrl(input);
+
+	assert.throws(normalize, { message: "web_fetch only supports http:// and https:// URLs" });
+});
+
+test("normalizes HTTP URLs without DNS resolution", () => {
+	const input = "http://Unresolvable.INVALID:80/docs";
+
+	const result = normalizeUrl(input);
+
+	assert.equal(result, "http://unresolvable.invalid/docs");
+});
+
+test("leaves special-use hostname restrictions to Obscura", () => {
 	const input = "https://service.local/docs";
 
-	const result = normalizeUrl(input, resolvePublicHost);
+	const result = normalizeUrl(input);
 
-	await assert.rejects(result, { message: "web_fetch URL must not target localhost or other special-use hostnames" });
+	assert.equal(result, "https://service.local/docs");
 });
 
-test("rejects private IP literals", async () => {
+test("leaves localhost restrictions to Obscura", () => {
+	const input = "http://localhost:8080/docs";
+
+	const result = normalizeUrl(input);
+
+	assert.equal(result, "http://localhost:8080/docs");
+});
+
+test("leaves private IPv4 restrictions to Obscura", () => {
 	const input = "http://192.168.1.1/docs";
 
-	const result = normalizeUrl(input, resolvePublicHost);
+	const result = normalizeUrl(input);
 
-	await assert.rejects(result, { message: "web_fetch URL must not target private, local, or reserved IP addresses" });
+	assert.equal(result, "http://192.168.1.1/docs");
 });
 
-const mappedIpv4BlockedRangeStarts = [
-	{ range: "0.0.0.0/8", input: "http://[::ffff:0.0.0.0]/" },
-	{ range: "10.0.0.0/8", input: "http://[::ffff:10.0.0.0]/" },
-	{ range: "100.64.0.0/10", input: "http://[::ffff:100.64.0.0]/" },
-	{ range: "127.0.0.0/8", input: "http://[::ffff:127.0.0.0]/" },
-	{ range: "169.254.0.0/16", input: "http://[::ffff:169.254.0.0]/" },
-	{ range: "172.16.0.0/12", input: "http://[::ffff:172.16.0.0]/" },
-	{ range: "192.0.0.0/24", input: "http://[::ffff:192.0.0.0]/" },
-	{ range: "192.0.2.0/24", input: "http://[::ffff:192.0.2.0]/" },
-	{ range: "192.88.99.0/24", input: "http://[::ffff:192.88.99.0]/" },
-	{ range: "192.168.0.0/16", input: "http://[::ffff:192.168.0.0]/" },
-	{ range: "198.18.0.0/15", input: "http://[::ffff:198.18.0.0]/" },
-	{ range: "198.51.100.0/24", input: "http://[::ffff:198.51.100.0]/" },
-	{ range: "203.0.113.0/24", input: "http://[::ffff:203.0.113.0]/" },
-	{ range: "224.0.0.0/4", input: "http://[::ffff:224.0.0.0]/" },
-	{ range: "240.0.0.0/4", input: "http://[::ffff:240.0.0.0]/" },
-] as const;
+test("leaves IPv6 loopback restrictions to Obscura", () => {
+	const input = "http://[::1]/docs";
 
-for (const { range, input } of mappedIpv4BlockedRangeStarts) {
-	test(`rejects IPv4-mapped IPv6 literals at the start of ${range}`, async () => {
-		const result = normalizeUrl(input, resolvePublicHost);
+	const result = normalizeUrl(input);
 
-		await assert.rejects(result, {
-			message: "web_fetch URL must not target private, local, or reserved IP addresses",
-		});
-	});
-}
+	assert.equal(result, "http://[::1]/docs");
+});
 
-test("rejects hostnames when any resolved address is private", async () => {
-	const resolveMixedHost: Resolver = async () => [{ address: "93.184.216.34" }, { address: "10.0.0.1" }];
+test("normalizes IPv4-mapped IPv6 URLs for Obscura", () => {
+	const input = "http://[::ffff:192.168.1.1]/docs";
 
-	const result = normalizeUrl("https://example.com/docs", resolveMixedHost);
+	const result = normalizeUrl(input);
 
-	await assert.rejects(result, {
-		message: "web_fetch URL hostname resolves to a private, local, or reserved IP address",
-	});
+	assert.equal(result, "http://[::ffff:c0a8:101]/docs");
 });

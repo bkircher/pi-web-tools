@@ -44,7 +44,7 @@ export function registerTool(pi: ExtensionAPI): void {
 		parameters,
 
 		async execute(_toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<Details>> {
-			const url = await normalizeUrl(params.url);
+			const url = normalizeUrl(params.url);
 			const evalScript = normalizeText(params.eval);
 			const selector = normalizeText(params.selector);
 			const proxy = normalizeText(params.proxy);

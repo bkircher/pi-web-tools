@@ -87,11 +87,8 @@ Behavior:
  -  Uses `--quiet` and `--output` so the tool controls output size consistently.
  -  Supports JavaScript-rendered pages through Obscura. Use `eval` to inspect
     rendered page content.
- -  The extension's private-network preflight protection remains enabled by
-    default; however, Obscura's own protection is disabled by `--stealth`.
- -  Rejects `localhost` and special-use hostnames, private or reserved IP
-    literals, and hostnames that resolve to private or reserved IP addresses
-    before invoking Obscura.
+ -  Uses Obscura's SSRF protection, including in `--stealth` mode. Obscura
+    checks destination addresses, DNS results, and redirect targets.
  -  Rejects URLs containing userinfo credentials, query parameters, or fragment
     values that look like credentials or tokens.
  -  Does not expose `--dump original`; binary or raw downloads should be handled
@@ -105,9 +102,9 @@ Behavior:
 
 Parameters:
 
- -  `url`: required public URL with an `http://` or `https://` scheme. Local or
-    private-network hosts, userinfo credentials, and sensitive query parameters
-    or fragment values are rejected.
+ -  `url`: required public URL with an `http://` or `https://` scheme. The
+    extension rejects userinfo credentials and sensitive query parameters or
+    fragment values.
  -  `dump`: optional output format when `eval` is not used:
      -  `markdown` (default)
      -  `text`
@@ -143,16 +140,9 @@ Output limits:
 Known issues
 ------------
 
-This extension uses Obscura in `--stealth` mode, which disables checks for
-private and internal addresses. Access to those addresses can be used for
-exfiltration.
+Obscura enforces network-address restrictions for both tools, including in
+`--stealth` mode. The extension checks tool inputs and limits tool output.
 
- -  Host checks are a preflight step only; redirects or later DNS changes can
-    still cause Obscura to connect to a different address. Redirect targets
-    should be checked separately.
- -  Coverage of special-use hostnames and reserved IP ranges is not exhaustive;
-    some special-use hostnames and reserved addresses may not be rejected.
-    Complete coverage is difficult to guarantee.
  -  Sensitive URL detection is heuristic. Query and fragment data is inspected
     with a maximum of two URL-form decoding passes; token-like values hidden
     more deeply inside nested URLs may be missed. Complete detection is

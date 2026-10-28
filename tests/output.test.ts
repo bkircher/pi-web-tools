@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
 
-test("returns empty output metadata", async () => {
+test("returns metadata for empty output", async () => {
 	const chunks: Uint8Array[] = [];
 
 	const result = await scanOutput(chunks);
@@ -13,7 +13,7 @@ test("returns empty output metadata", async () => {
 	assert.equal(result.truncated, false);
 });
 
-test("returns output below both limits unchanged", async () => {
+test("preserves output below both limits", async () => {
 	const chunks = [Buffer.from("alpha\nbeta\n")];
 
 	const result = await scanOutput(chunks);
@@ -36,7 +36,7 @@ test("truncates output at the line limit", async () => {
 	assert.equal(result.truncation.truncatedBy, "lines");
 });
 
-test("truncates output at the byte limit without returning a partial line", async () => {
+test("truncates output at the byte limit", async () => {
 	const chunks = [Buffer.from("abc\ndef")];
 
 	const result = await scanOutput(chunks, { maxBytes: 5, maxLines: 10 });
@@ -47,7 +47,7 @@ test("truncates output at the byte limit without returning a partial line", asyn
 	assert.equal(result.truncation.truncatedBy, "bytes");
 });
 
-test("identifies a multibyte first line that exceeds the byte limit", async () => {
+test("detects a first line over the byte limit", async () => {
 	const chunks = [Buffer.from("ééé")];
 
 	const result = await scanOutput(chunks, { maxBytes: 5, maxLines: 10 });
@@ -58,7 +58,7 @@ test("identifies a multibyte first line that exceeds the byte limit", async () =
 	assert.equal(result.truncation.truncatedBy, "bytes");
 });
 
-test("does not decode a partial UTF-8 code point at the preview boundary", async () => {
+test("omits partial UTF-8 characters from previews", async () => {
 	const chunks = [Buffer.from("123456😀tail")];
 
 	const result = await scanOutput(chunks, { maxBytes: 3, maxLines: 10 });
@@ -68,7 +68,7 @@ test("does not decode a partial UTF-8 code point at the preview boundary", async
 	assert.equal(result.truncation.firstLineExceedsLimit, true);
 });
 
-test("counts CRLF lines without adding an empty trailing line", async () => {
+test("counts lines with CRLF endings", async () => {
 	const chunks = [Buffer.from("a\r\nb\r\n")];
 
 	const result = await scanOutput(chunks);
@@ -78,7 +78,7 @@ test("counts CRLF lines without adding an empty trailing line", async () => {
 	assert.equal(result.truncation.content, "a\r\nb\r\n");
 });
 
-test("counts the final line when output has no trailing newline", async () => {
+test("counts lines without a trailing newline", async () => {
 	const chunks = [Buffer.from("a\nb")];
 
 	const result = await scanOutput(chunks);
@@ -88,7 +88,7 @@ test("counts the final line when output has no trailing newline", async () => {
 	assert.equal(result.truncation.content, "a\nb");
 });
 
-test("keeps a bounded preview for output larger than ten MiB", async () => {
+test("limits preview size for large output", async () => {
 	const chunks = [Buffer.alloc(10_485_761, 0x61)];
 
 	const result = await scanOutput(chunks);

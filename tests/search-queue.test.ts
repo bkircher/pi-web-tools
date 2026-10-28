@@ -23,7 +23,7 @@ async function createExecution(title = "Example", href = "https://example.com/")
 	return { output };
 }
 
-test("web_search keeps cache state within each registration", async () => {
+test("keeps caches separate across registrations", async () => {
 	const firstExecution = await createExecution("First registration", "https://example.com/first");
 	const secondExecution = await createExecution("Second registration", "https://example.com/second");
 	let firstCalls = 0;
@@ -55,7 +55,7 @@ test("web_search keeps cache state within each registration", async () => {
 	assert.equal(secondCached.details?.results[0]?.title, "Second registration");
 });
 
-test("web_search rejects a cached response when already cancelled", async () => {
+test("rejects cached responses when cancelled", async () => {
 	const execution = await createExecution();
 	let calls = 0;
 	const tool = getSearchTool(async () => {
@@ -73,7 +73,7 @@ test("web_search rejects a cached response when already cancelled", async () => 
 	assert.equal(calls, 1);
 });
 
-test("web_search serializes registrations and spaces their start times", async (context) => {
+test("serializes and spaces searches across registrations", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
 	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
@@ -108,7 +108,7 @@ test("web_search serializes registrations and spaces their start times", async (
 	assert.equal(secondCalls, 1);
 });
 
-test("web_search cancels a queued request before an earlier search completes", async () => {
+test("cancels queued searches without waiting", async () => {
 	const execution = await createExecution();
 	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
 	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();
@@ -155,7 +155,7 @@ test("web_search cancels a queued request before an earlier search completes", a
 	assert.equal(secondCalls, 0);
 });
 
-test("web_search cancels its interval delay and releases the queue", async (context) => {
+test("cancels searches during the queue delay", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1000 });
 	const { promise: firstStarted, resolve: markFirstStarted } = Promise.withResolvers<void>();
@@ -221,7 +221,7 @@ test("web_search cancels its interval delay and releases the queue", async (cont
 	assert.equal(thirdCallsBeforeTimerAdvance, 1);
 });
 
-test("web_search continues queued searches after a failure", async (context) => {
+test("continues queued searches after a failure", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 4000 });
 	let secondCalls = 0;
@@ -254,7 +254,7 @@ test("web_search continues queued searches after a failure", async (context) => 
 	assert.equal(secondCalls, 1);
 });
 
-test("web_search reuses a queued response from the cache", async (context) => {
+test("reuses cached results for queued searches", async (context) => {
 	const execution = await createExecution();
 	context.mock.timers.enable({ apis: ["Date"], now: 2000 });
 	const { promise: firstExecution, resolve: completeFirst } = Promise.withResolvers<Execution>();

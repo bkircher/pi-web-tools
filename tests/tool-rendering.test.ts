@@ -59,7 +59,7 @@ function createFetchResult(): AgentToolResult<WebFetchDetails> {
 	};
 }
 
-test("web_search renders the exact DuckDuckGo request URL", () => {
+test("renders the web_search request URL", () => {
 	const component = renderWebSearchCall({ query: "pnpm docs" }, theme);
 
 	const lines = renderLines(component);
@@ -67,7 +67,7 @@ test("web_search renders the exact DuckDuckGo request URL", () => {
 	assert.deepEqual(lines, ["Web Search https://html.duckduckgo.com/html/?q=pnpm+docs&kl=wt-wt&kp=-1"]);
 });
 
-test("web_search keeps result content hidden in the collapsed summary", () => {
+test("hides web_search content when collapsed", () => {
 	const result = createSearchResult({
 		results: [
 			{ title: "pnpm", url: "https://pnpm.io/" },
@@ -82,7 +82,7 @@ test("web_search keeps result content hidden in the collapsed summary", () => {
 	assert.deepEqual(renderLines(component), ["✓ · Obscura · 2 results · 123B output · 42ms"]);
 });
 
-test("web_search displays result content when expanded", () => {
+test("shows web_search content when expanded", () => {
 	const result = createSearchResult();
 
 	const component = renderWebSearchResult(result, { expanded: true, isPartial: false }, theme, renderContext);
@@ -94,7 +94,7 @@ test("web_search displays result content when expanded", () => {
 	]);
 });
 
-test("web_fetch renders the requested URL", () => {
+test("renders the web_fetch request URL", () => {
 	const component = renderWebFetchCall({ url: "https://example.com/docs" }, theme);
 
 	const lines = renderLines(component);
@@ -102,7 +102,7 @@ test("web_fetch renders the requested URL", () => {
 	assert.deepEqual(lines, ["Web Fetch https://example.com/docs"]);
 });
 
-test("web_fetch percent-encodes terminal control characters in valid URLs", () => {
+test("percent-encodes control characters in valid URLs", () => {
 	const component = renderWebFetchCall({ url: "https://example.com/\u001b]52;c;SGVsbG8=\u0007/end" }, theme);
 
 	const lines = renderLines(component);
@@ -110,7 +110,7 @@ test("web_fetch percent-encodes terminal control characters in valid URLs", () =
 	assert.deepEqual(lines, ["Web Fetch https://example.com/%1B]52;c;SGVsbG8=%07/end"]);
 });
 
-test("web_fetch escapes terminal control characters in invalid URLs", () => {
+test("escapes control characters in invalid URLs", () => {
 	const component = renderWebFetchCall({ url: "invalid\u001b[31m\nurl\u009d\u202e" }, theme);
 
 	const lines = renderLines(component);
@@ -118,7 +118,7 @@ test("web_fetch escapes terminal control characters in invalid URLs", () => {
 	assert.deepEqual(lines, ["Web Fetch invalid\\u001B[31m\\u000Aurl\\u009D\\u202E"]);
 });
 
-test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
+test("hides web_fetch content when collapsed", () => {
 	const result = createFetchResult();
 
 	const component = renderWebFetchResult(result, { expanded: false, isPartial: false }, theme, renderContext);
@@ -126,7 +126,7 @@ test("web_fetch keeps fetched content hidden in the collapsed summary", () => {
 	assert.deepEqual(renderLines(component), ["✓ markdown · 2.0KB output · 750ms"]);
 });
 
-test("web_fetch displays fetched content when expanded", () => {
+test("shows web_fetch content when expanded", () => {
 	const result = createFetchResult();
 
 	const component = renderWebFetchResult(result, { expanded: true, isPartial: false }, theme, renderContext);

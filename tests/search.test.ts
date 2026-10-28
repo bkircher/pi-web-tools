@@ -27,7 +27,7 @@ async function createTextExecution(text: string) {
 	return { output };
 }
 
-test("searches with a fixed Obscura evaluation and normalizes results", async () => {
+test("returns normalized search results", async () => {
 	let capturedRequest: Parameters<RunObscura>[0] | undefined;
 	let capturedOptions: Parameters<RunObscura>[1] | undefined;
 	const execution = await createExecution(
@@ -75,7 +75,7 @@ test("searches with a fixed Obscura evaluation and normalizes results", async ()
 	assert.equal(capturedOptions?.exec, unusedExec);
 });
 
-test("limits stderr returned with search details", async () => {
+test("limits search stderr", async () => {
 	const execution = await createExecution(validEvaluation, "a".repeat(100_000));
 	const runObscura: RunObscura = async () => execution;
 
@@ -89,7 +89,7 @@ test("limits stderr returned with search details", async () => {
 	assert.match(response.stderr ?? "", /\[Obscura stderr truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
 });
 
-test("reports a DuckDuckGo anti-bot challenge without another command or retry", async (context) => {
+test("reports a DuckDuckGo anti-bot challenge", async (context) => {
 	const execution = await createExecution({ ...validEvaluation, challenge: true });
 	const runObscura = context.mock.fn<RunObscura>(async () => execution);
 	const exec = context.mock.fn<Exec>(unusedExec);
@@ -156,7 +156,7 @@ test("rejects an unexpected final host", async () => {
 	});
 });
 
-test("rejects invalid structured result fields", async () => {
+test("rejects invalid search result fields", async () => {
 	const execution = await createExecution({
 		...validEvaluation,
 		results: [{ title: "Example", href: 42 }],
@@ -174,7 +174,7 @@ test("rejects invalid structured result fields", async () => {
 	});
 });
 
-test("reports the search process timeout separately from the navigation timeout", async () => {
+test("reports search process timeouts", async () => {
 	const runObscura: RunObscura = async () => {
 		throw new ObscuraError("timeout", "obscura fetch timed out");
 	};
@@ -188,7 +188,7 @@ test("reports the search process timeout separately from the navigation timeout"
 	await assert.rejects(result, { message: "DuckDuckGo search timed out after 20 seconds" });
 });
 
-test("does not infer a timeout from command failure text", async () => {
+test("does not infer timeouts from error text", async () => {
 	const runObscura: RunObscura = async () => {
 		throw new ObscuraError("command-failed", "obscura fetch failed with exit code 2: invalid timeout argument");
 	};
@@ -205,7 +205,7 @@ test("does not infer a timeout from command failure text", async () => {
 	});
 });
 
-test("limits diagnostic output in a search failure", async () => {
+test("limits search failure diagnostics", async () => {
 	const runObscura: RunObscura = async () => {
 		throw new ObscuraError("command-failed", "a".repeat(100_000));
 	};
@@ -224,7 +224,7 @@ test("limits diagnostic output in a search failure", async () => {
 	});
 });
 
-test("reports cancellation separately", async () => {
+test("reports search cancellation", async () => {
 	const controller = new AbortController();
 	const runObscura: RunObscura = async () => {
 		controller.abort();
@@ -241,7 +241,7 @@ test("reports cancellation separately", async () => {
 	await assert.rejects(result, { message: "DuckDuckGo search was cancelled" });
 });
 
-test("reports a command failure without retrying", async () => {
+test("reports command failures", async () => {
 	let calls = 0;
 	const runObscura: RunObscura = async () => {
 		calls += 1;

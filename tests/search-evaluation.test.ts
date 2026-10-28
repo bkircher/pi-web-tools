@@ -26,7 +26,7 @@ function evaluatePage(document: object): RunObscura {
 	};
 }
 
-test("extracts search results from the rendered page", async () => {
+test("extracts results from rendered pages", async () => {
 	const document = {
 		querySelector: () => null,
 		querySelectorAll: () => [resultLink],
@@ -41,7 +41,7 @@ test("extracts search results from the rendered page", async () => {
 	assert.deepEqual(response.results, [{ title: "Example", url: "https://example.com/", snippet: "Example page" }]);
 });
 
-test("extracts search results without a snippet", async () => {
+test("extracts results without snippets", async () => {
 	const document = {
 		querySelector: () => null,
 		querySelectorAll: () => [{ ...resultLink, closest: () => null }],
@@ -56,7 +56,7 @@ test("extracts search results without a snippet", async () => {
 	assert.deepEqual(response.results, [{ title: "Example", url: "https://example.com/" }]);
 });
 
-test("returns no results when the rendered page has no result links", async () => {
+test("returns no results when result links are missing", async () => {
 	const document = {
 		querySelector: () => null,
 		querySelectorAll: () => [],
@@ -71,7 +71,7 @@ test("returns no results when the rendered page has no result links", async () =
 	assert.deepEqual(response.results, []);
 });
 
-test("extracts at most 20 results from the rendered page", async () => {
+test("limits extracted results to 20", async () => {
 	const urls = [
 		"https://example.com/1",
 		"https://example.com/2",
@@ -115,7 +115,7 @@ test("extracts at most 20 results from the rendered page", async () => {
 	});
 });
 
-test("rejects a rendered challenge page", async () => {
+test("rejects anti-bot challenge pages", async () => {
 	const elements = new Map([
 		["#challenge-form, .anomaly-modal__modal, .anomaly-modal__challenge, form[action*='anomaly.js']", {}],
 	]);

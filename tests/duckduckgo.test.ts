@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeResults as normalizeDuckDuckGoResults } from "../extensions/web-tools/search/duckduckgo.ts";
 
-test("normalizes result text and DuckDuckGo redirect URLs", () => {
+test("normalizes result text and redirect URLs", () => {
 	const rawResults = [
 		{
 			title: "  Example \n Docs  ",
@@ -22,7 +22,7 @@ test("normalizes result text and DuckDuckGo redirect URLs", () => {
 	]);
 });
 
-test("does not unwrap uddg parameters on non-DuckDuckGo URLs", () => {
+test("preserves non-DuckDuckGo URLs with uddg parameters", () => {
 	const href = "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F";
 
 	const results = normalizeDuckDuckGoResults([{ title: "Example", href }]);
@@ -30,7 +30,7 @@ test("does not unwrap uddg parameters on non-DuckDuckGo URLs", () => {
 	assert.deepEqual(results, [{ title: "Example", url: "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F" }]);
 });
 
-test("does not unwrap DuckDuckGo links outside the redirect path", () => {
+test("preserves DuckDuckGo URLs outside the redirect path", () => {
 	const href = "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F";
 
 	const results = normalizeDuckDuckGoResults([{ title: "Example", href }]);

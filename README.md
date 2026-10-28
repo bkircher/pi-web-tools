@@ -39,8 +39,7 @@ backend.
 
 ### web\_fetch
 
-Fetches a specific URL with the
-[`obscura`] CLI.
+Fetches a specific URL with the [`obscura`] CLI.
 
 Behavior:
 
@@ -111,8 +110,7 @@ Obscura enforces network-address restrictions for both tools, including in
     difficult to guarantee.
 
 Run pi under `sandbox-exec(1)` and use Little Snitch, or otherwise isolate pi
-from private data and infrastructure, to reduce the risk of exfiltration
-attacks.
+from private data and infrastructure, to reduce the risk of exfiltration.
 
 
 Links

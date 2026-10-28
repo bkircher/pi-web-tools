@@ -14,7 +14,7 @@ const request: ObscuraRequest = {
 	timeout: 30,
 };
 
-test("formats complete Obscura output without retention details", async () => {
+test("formats complete Obscura output", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
 	assert.equal(output.truncated, false);
 	const execution = {
@@ -42,7 +42,7 @@ test("formats complete Obscura output without retention details", async () => {
 	});
 });
 
-test("limits stderr as part of the returned tool output", async () => {
+test("includes stderr in the output byte limit", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
 	assert.equal(output.truncated, false);
 	const execution = {
@@ -61,7 +61,7 @@ test("limits stderr as part of the returned tool output", async () => {
 	assert.match(result.details.stderr ?? "", /\[Obscura stderr truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
 });
 
-test("limits stderr by the total tool output line count", async () => {
+test("includes stderr in the output line limit", async () => {
 	const output = await scanOutput([Buffer.from("Page content")]);
 	assert.equal(output.truncated, false);
 	const execution = {
@@ -78,7 +78,7 @@ test("limits stderr by the total tool output line count", async () => {
 	assert.equal(result.details.truncated, true);
 });
 
-test("formats truncated output with its retained file path", async () => {
+test("includes the full output path after truncation", async () => {
 	const output = await scanOutput([Buffer.from("alpha\nbeta\n")], { maxBytes: 100, maxLines: 1 });
 	assert.equal(output.truncated, true);
 	const execution = {
@@ -100,7 +100,7 @@ test("formats truncated output with its retained file path", async () => {
 	assert.equal(result.details.fullOutputPath, "/retained/output.txt");
 });
 
-test("returns a UTF-8 prefix when the first line exceeds the byte limit", async () => {
+test("returns a UTF-8 prefix for an oversized first line", async () => {
 	const output = await scanOutput([Buffer.from("ééé")], { maxBytes: 5, maxLines: 10 });
 	assert.equal(output.truncated, true);
 	const execution = {

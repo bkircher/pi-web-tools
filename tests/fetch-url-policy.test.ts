@@ -20,57 +20,57 @@ test("rejects URL credentials", () => {
 
 const sensitiveUrlCases = [
 	{
-		name: "plain query field names",
+		name: "sensitive query fields",
 		input: "https://example.com/docs?access_token=secret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "encoded query field names",
+		name: "encoded sensitive query fields",
 		input: "https://example.com/docs?access%5Ftoken=secret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "double-encoded query field names",
+		name: "double-encoded sensitive query fields",
 		input: "https://example.com/docs?access%255Ftoken=secret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "encoded query fields alongside malformed escapes",
+		name: "sensitive query fields with malformed escapes",
 		input: "https://example.com/docs?ignored=%&access%5Ftoken=secret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "encoded token-like query values",
+		name: "encoded query token values",
 		input: "https://example.com/docs?value=%67hp_1234567890",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "sensitive fields in encoded nested query URLs",
+		name: "tokens in encoded nested query URLs",
 		input: "https://example.com/docs?redirect=https%3A%2F%2Fclient.example%2Fcallback%3Faccess%5Ftoken%3Dsecret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "sensitive fields in double-encoded nested query URLs",
+		name: "tokens in double-encoded nested query URLs",
 		input: "https://example.com/docs?redirect=https%253A%252F%252Fclient.example%252Fcallback%253Faccess%255Ftoken%253Dsecret-value",
 		expectedMessage: "web_fetch URL query must not include credentials or tokens",
 	},
 	{
-		name: "plain fragment field names",
+		name: "sensitive fragment fields",
 		input: "https://example.com/docs#access_token=secret-value",
 		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
 	},
 	{
-		name: "encoded fragment field names",
+		name: "encoded sensitive fragment fields",
 		input: "https://example.com/docs#access%5Ftoken%3Dsecret-value",
 		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
 	},
 	{
-		name: "double-encoded fragment field names",
+		name: "double-encoded sensitive fragment fields",
 		input: "https://example.com/docs#access%255Ftoken%253Dsecret-value",
 		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
 	},
 	{
-		name: "sensitive fields in encoded nested fragment URLs",
+		name: "tokens in encoded nested fragment URLs",
 		input: "https://example.com/docs#callback?redirect=https%3A%2F%2Fclient.example%2F%3Faccess%5Ftoken%3Dsecret-value",
 		expectedMessage: "web_fetch URL fragment must not include credentials or tokens",
 	},
@@ -86,15 +86,15 @@ for (const { name, input, expectedMessage } of sensitiveUrlCases) {
 
 const allowedSensitiveLookingUrlCases = [
 	{
-		name: "non-field query values",
+		name: "token names as query values",
 		input: "https://example.com/docs?q=access_token",
 	},
 	{
-		name: "query data beyond two decoding layers",
+		name: "triple-encoded query fields",
 		input: "https://example.com/docs?access%25255Ftoken=public",
 	},
 	{
-		name: "fragment data beyond two decoding layers",
+		name: "triple-encoded fragment fields",
 		input: "https://example.com/docs#access%25255Ftoken%25253Dpublic",
 	},
 ] as const;
@@ -139,7 +139,7 @@ test("normalizes HTTP URLs without DNS resolution", () => {
 	assert.equal(result, "http://unresolvable.invalid/docs");
 });
 
-test("leaves special-use hostname restrictions to Obscura", () => {
+test("allows special-use hostnames", () => {
 	const input = "https://service.local/docs";
 
 	const result = normalizeUrl(input);
@@ -147,7 +147,7 @@ test("leaves special-use hostname restrictions to Obscura", () => {
 	assert.equal(result, "https://service.local/docs");
 });
 
-test("leaves localhost restrictions to Obscura", () => {
+test("allows localhost URLs", () => {
 	const input = "http://localhost:8080/docs";
 
 	const result = normalizeUrl(input);
@@ -155,7 +155,7 @@ test("leaves localhost restrictions to Obscura", () => {
 	assert.equal(result, "http://localhost:8080/docs");
 });
 
-test("leaves private IPv4 restrictions to Obscura", () => {
+test("allows private IPv4 URLs", () => {
 	const input = "http://192.168.1.1/docs";
 
 	const result = normalizeUrl(input);
@@ -163,7 +163,7 @@ test("leaves private IPv4 restrictions to Obscura", () => {
 	assert.equal(result, "http://192.168.1.1/docs");
 });
 
-test("leaves IPv6 loopback restrictions to Obscura", () => {
+test("allows IPv6 loopback URLs", () => {
 	const input = "http://[::1]/docs";
 
 	const result = normalizeUrl(input);
@@ -171,7 +171,7 @@ test("leaves IPv6 loopback restrictions to Obscura", () => {
 	assert.equal(result, "http://[::1]/docs");
 });
 
-test("normalizes IPv4-mapped IPv6 URLs for Obscura", () => {
+test("normalizes IPv4-mapped IPv6 URLs", () => {
 	const input = "http://[::ffff:192.168.1.1]/docs";
 
 	const result = normalizeUrl(input);

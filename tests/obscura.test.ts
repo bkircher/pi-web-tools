@@ -31,7 +31,7 @@ function createStorage(overrides: Partial<ObscuraStorage> = {}): ObscuraStorage 
 	};
 }
 
-test("runs Obscura dump output in quiet mode", async (context) => {
+test("runs Obscura dump requests in quiet mode", async (context) => {
 	const storage = createStorage({ readOutputFile: () => scanOutput([]) });
 	const exec = context.mock.fn<ObscuraExec>(async () => ({ stdout: "", stderr: "", code: 0, killed: false }));
 
@@ -61,7 +61,7 @@ test("runs Obscura dump output in quiet mode", async (context) => {
 	]);
 });
 
-test("runs Obscura eval output in quiet mode without dump-only options", async (context) => {
+test("runs Obscura eval requests in quiet mode", async (context) => {
 	const request: ObscuraRequest = {
 		mode: "eval",
 		script: "document.title",
@@ -95,7 +95,7 @@ test("runs Obscura eval output in quiet mode without dump-only options", async (
 	]);
 });
 
-test("retains a truncated output file before deleting the working directory", async () => {
+test("retains full output after truncation", async () => {
 	const scan = await scanOutput([Buffer.from("a".repeat(51_201))]);
 	let retainedOutputPath: string | undefined;
 	let removedWorkingDirectory: string | undefined;
@@ -153,7 +153,7 @@ test("deletes the working directory when Obscura fails", async () => {
 	assert.equal(removedWorkingDirectory, "/work");
 });
 
-test("limits diagnostic output from a failed Obscura command", async () => {
+test("limits Obscura failure diagnostics", async () => {
 	const storage = createStorage();
 	const exec = async () => ({ stdout: "", stderr: "a".repeat(100_000), code: 2, killed: false });
 
@@ -168,7 +168,7 @@ test("limits diagnostic output from a failed Obscura command", async () => {
 	});
 });
 
-test("reports the process deadline when Pi kills Obscura", async () => {
+test("reports killed processes as timeouts", async () => {
 	let processTimeoutMs: number | undefined;
 	const storage = createStorage();
 	const exec: ObscuraExec = async (_command, _args, options) => {
@@ -187,7 +187,7 @@ test("reports the process deadline when Pi kills Obscura", async () => {
 	assert.equal(processTimeoutMs, 45_000);
 });
 
-test("reports Obscura exit code 124 as a process timeout", async () => {
+test("reports exit code 124 as a timeout", async () => {
 	const storage = createStorage();
 	const exec = async () => ({ stdout: "", stderr: "hard timeout", code: 124, killed: false });
 
@@ -201,7 +201,7 @@ test("reports Obscura exit code 124 as a process timeout", async () => {
 	});
 });
 
-test("reports a killed Obscura process with an aborted signal as cancellation", async () => {
+test("reports aborted processes as cancellation", async () => {
 	const controller = new AbortController();
 	controller.abort();
 	const storage = createStorage();

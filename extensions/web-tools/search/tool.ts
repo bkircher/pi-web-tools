@@ -21,7 +21,6 @@ type ScheduledOperation<T> = { status: "complete"; value: T } | { status: "ready
 
 type SearchToolOptions = {
 	runObscura?: RunObscura;
-	diagnostics?: boolean;
 };
 
 const CACHE_TTL_MS = 2 * 60 * 1000;
@@ -158,7 +157,6 @@ export function createSearchTool(
 	options: SearchToolOptions = {},
 ): ToolDefinition<typeof parameters, Details> {
 	const cache: SearchCache = new Map();
-	const diagnostics = options.diagnostics ?? process.env.PI_WEB_SEARCH_DIAGNOSTICS === "1";
 
 	return {
 		name: "web_search",
@@ -184,7 +182,6 @@ export function createSearchTool(
 					cwd: ctx.cwd,
 					signal,
 					runObscura: options.runObscura,
-					diagnostics,
 				}),
 			);
 			const results = response.results.slice(0, limit);
@@ -218,6 +215,6 @@ export function createSearchTool(
 /**
  * Register the `web_search` tool, which searches DuckDuckGo through Obscura.
  */
-export function registerTool(pi: ExtensionAPI, options: SearchToolOptions = {}): void {
-	pi.registerTool(createSearchTool(pi, options));
+export function registerTool(pi: ExtensionAPI): void {
+	pi.registerTool(createSearchTool(pi));
 }

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-	buildArgs as buildObscuraArgs,
 	execute as executeObscuraFetch,
 	type Exec as ObscuraExec,
 	type Request as ObscuraRequest,
@@ -32,12 +31,15 @@ function createStorage(overrides: Partial<ObscuraStorage> = {}): ObscuraStorage 
 	};
 }
 
-test("builds Obscura dump arguments", () => {
-	const outputPath = "/work/output.txt";
+test("runs Obscura dump output in quiet mode", async (context) => {
+	const storage = createStorage({ readOutputFile: () => scanOutput([]) });
+	const exec = context.mock.fn<ObscuraExec>(async () => ({ stdout: "", stderr: "", code: 0, killed: false }));
 
-	const result = buildObscuraArgs(dumpRequest, outputPath);
+	await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
-	assert.deepEqual(result, [
+	assert.equal(exec.mock.callCount(), 1);
+	assert.equal(exec.mock.calls[0].arguments[0], "obscura");
+	assert.deepEqual(exec.mock.calls[0].arguments[1], [
 		"fetch",
 		"--quiet",
 		"--stealth",
@@ -59,7 +61,7 @@ test("builds Obscura dump arguments", () => {
 	]);
 });
 
-test("builds Obscura eval arguments without dump-only options", () => {
+test("runs Obscura eval output in quiet mode without dump-only options", async (context) => {
 	const request: ObscuraRequest = {
 		mode: "eval",
 		script: "document.title",
@@ -68,10 +70,14 @@ test("builds Obscura eval arguments without dump-only options", () => {
 		wait: 0,
 		timeout: 10,
 	};
+	const storage = createStorage({ readOutputFile: () => scanOutput([]) });
+	const exec = context.mock.fn<ObscuraExec>(async () => ({ stdout: "", stderr: "", code: 0, killed: false }));
 
-	const result = buildObscuraArgs(request, "/work/output.txt");
+	await executeObscuraFetch(request, { exec, cwd: "/project", storage });
 
-	assert.deepEqual(result, [
+	assert.equal(exec.mock.callCount(), 1);
+	assert.equal(exec.mock.calls[0].arguments[0], "obscura");
+	assert.deepEqual(exec.mock.calls[0].arguments[1], [
 		"fetch",
 		"--quiet",
 		"--stealth",
@@ -79,37 +85,6 @@ test("builds Obscura eval arguments without dump-only options", () => {
 		"document.title",
 		"--wait-until",
 		"load",
-		"--wait",
-		"0",
-		"--timeout",
-		"10",
-		"--output",
-		"/work/output.txt",
-		"https://example.com/",
-	]);
-});
-
-test("enables verbose logging only when requested", () => {
-	const request: ObscuraRequest = {
-		mode: "eval",
-		script: "document.title",
-		url: "https://example.com/",
-		waitUntil: "domcontentloaded",
-		wait: 0,
-		timeout: 10,
-		verbose: true,
-	};
-
-	const result = buildObscuraArgs(request, "/work/output.txt");
-
-	assert.deepEqual(result, [
-		"fetch",
-		"--verbose",
-		"--stealth",
-		"--eval",
-		"document.title",
-		"--wait-until",
-		"domcontentloaded",
 		"--wait",
 		"0",
 		"--timeout",

@@ -89,12 +89,13 @@ test("limits stderr returned with search details", async () => {
 	assert.match(response.stderr ?? "", /\[Obscura stderr truncated: 2000-line or 50\.0KB limit reached\.\]$/u);
 });
 
-test("reports a DuckDuckGo anti-bot challenge", async () => {
+test("reports a DuckDuckGo anti-bot challenge without another command or retry", async (context) => {
 	const execution = await createExecution({ ...validEvaluation, challenge: true });
-	const runObscura: RunObscura = async () => execution;
+	const runObscura = context.mock.fn<RunObscura>(async () => execution);
+	const exec = context.mock.fn<Exec>(unusedExec);
 
 	const result = searchDuckDuckGo("challenge test", {
-		exec: unusedExec,
+		exec,
 		cwd: "/project",
 		runObscura,
 	});
@@ -102,6 +103,8 @@ test("reports a DuckDuckGo anti-bot challenge", async () => {
 	await assert.rejects(result, {
 		message: "DuckDuckGo blocked the search with an anti-bot challenge",
 	});
+	assert.equal(runObscura.mock.callCount(), 1);
+	assert.equal(exec.mock.callCount(), 0);
 });
 
 test("rejects malformed Obscura output", async () => {

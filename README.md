@@ -37,44 +37,6 @@ apart. A detected anti-bot challenge fails the search. A failed search is not
 retried, and the tool does not fall back to a Node.js backend or any other
 backend.
 
-#### Challenge diagnostics
-
-To save evidence when DuckDuckGo returns an anti-bot challenge, start pi with:
-
-~~~~ sh
-PI_WEB_SEARCH_DIAGNOSTICS=1 pi
-~~~~
-
-Diagnostics are disabled by default. With this setting enabled, the tool
-captures evidence during the existing navigation and enables Obscura's verbose
-logging. It does not retry the search or fetch the page again.
-
-When the tool detects a challenge, the error includes the path to a private
-`pi-web-search-failure-*` directory under the system temporary directory
-(`$TMPDIR` on macOS). It contains:
-
- -  `report.json`: query, timestamp, search and final URLs, navigation settings,
-    available Obscura version, page title, document readiness state, result
-    count, matched selectors, page-text sample, and truncation flags.
- -  `challenge.html`: an HTML sample from the first element that matches each
-    challenge selector. Each sample has a truncation flag.
- -  `stderr.txt`: bounded Obscura logs, with a notice if truncated.
-
-Page samples share a 7000 UTF-16 code-unit budget. JSON escaping is accounted
-for so the challenge evaluation stays below the 50 KB output limit. Stderr
-is limited to 2000 lines or 50 KB. Directory permissions are `0700`; file
-permissions are `0600`, subject to the process umask.
-
-Successful searches do not leave reports or return verbose logs. Only the
-report path is returned with the challenge error, not the captured page content.
-If report creation fails, the tool keeps the challenge error and adds a notice.
-Reports remain available after the call; delete them when they are no longer
-needed.
-
-Each report contains rendered-page samples, not the original HTTP response.
-It does not collect the HTTP status code, response headers, cookies, or browser
-storage.
-
 ### web\_fetch
 
 Fetches a specific URL with the

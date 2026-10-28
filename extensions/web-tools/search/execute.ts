@@ -2,21 +2,18 @@ import {
 	calculateProcessTimeoutSeconds,
 	execute,
 	ObscuraError,
-	type ExecuteOptions,
+	type Exec,
 	type Execution,
 	type Request,
 } from "../shared/obscura.js";
 import { formatTruncationNotice, limitText } from "../shared/output.js";
-import { saveChallengeReport, type DiagnosticStorage } from "./diagnostics.js";
 import { buildSearchUrl, MAX_RESULTS, normalizeResults } from "./duckduckgo.js";
-import { buildSearchEvaluationScript } from "./evaluation.js";
 import type { ResponseData, UntrustedResult } from "./types.js";
 
 type EvaluationData = {
 	pageUrl: string;
 	challenge: boolean;
 	results: UntrustedResult[];
-	evidence?: unknown;
 };
 
 export type RunObscura = typeof execute;
@@ -24,7 +21,23 @@ export type RunObscura = typeof execute;
 const SEARCH_HOSTNAME = buildSearchUrl("").hostname;
 const SEARCH_NAVIGATION_TIMEOUT_SECONDS = 10;
 
-const CHALLENGE_MESSAGE = "DuckDuckGo blocked the search with an anti-bot challenge";
+const SEARCH_EVALUATION_SCRIPT = `(() => {
+	const challenge = Boolean(document.querySelector(
+		"#challenge-form, .anomaly-modal__modal, .anomaly-modal__challenge, form[action*='anomaly.js']",
+	));
+	const results = Array.from(document.querySelectorAll("a.result__a"))
+		.slice(0, ${MAX_RESULTS})
+		.map((link) => {
+			const container = link.closest(".result");
+			const snippet = container?.querySelector(".result__snippet");
+			return {
+				title: link.textContent ?? "",
+				href: link.getAttribute("href") ?? "",
+				snippet: snippet?.textContent ?? "",
+			};
+		});
+	return { pageUrl: location.href, challenge, results };
+})()`;
 
 function errorReason(error: unknown): string {
 	if (error instanceof Error && error.message) return error.message;
@@ -87,7 +100,6 @@ function parseEvaluation(execution: Execution): EvaluationData {
 		pageUrl: record.pageUrl,
 		challenge: record.challenge,
 		results,
-		evidence: record.evidence,
 	};
 }
 
@@ -107,12 +119,10 @@ function validateFinalHost(pageUrl: string): void {
 export async function searchDuckDuckGo(
 	query: string,
 	options: {
-		exec: ExecuteOptions["exec"];
+		exec: Exec;
 		cwd: string;
 		signal?: AbortSignal;
 		runObscura?: RunObscura;
-		diagnostics?: boolean;
-		diagnosticStorage?: DiagnosticStorage;
 	},
 ): Promise<ResponseData> {
 	if (options.signal?.aborted) throw new Error("DuckDuckGo search was cancelled");
@@ -120,12 +130,11 @@ export async function searchDuckDuckGo(
 	const searchUrl = buildSearchUrl(query).href;
 	const request: Request = {
 		mode: "eval",
-		script: buildSearchEvaluationScript(options.diagnostics === true),
+		script: SEARCH_EVALUATION_SCRIPT,
 		url: searchUrl,
 		waitUntil: "domcontentloaded",
 		wait: 0,
 		timeout: SEARCH_NAVIGATION_TIMEOUT_SECONDS,
-		...(options.diagnostics ? { verbose: true } : {}),
 	};
 	const processTimeoutSeconds = calculateProcessTimeoutSeconds(request.timeout, request.wait);
 	let execution: Execution;
@@ -156,25 +165,12 @@ export async function searchDuckDuckGo(
 	const evaluation = parseEvaluation(execution);
 	validateFinalHost(evaluation.pageUrl);
 	if (evaluation.challenge) {
-		if (!options.diagnostics) throw new Error(CHALLENGE_MESSAGE);
-
-		let reportPath: string;
-		try {
-			reportPath = await saveChallengeReport(
-				{ query, request, pageUrl: evaluation.pageUrl, evidence: evaluation.evidence, stderr: execution.stderr },
-				{ exec: options.exec, cwd: options.cwd, signal: options.signal, storage: options.diagnosticStorage },
-			);
-		} catch (error) {
-			if (options.signal?.aborted) throw new Error("DuckDuckGo search was cancelled", { cause: error });
-			throw new Error(`${CHALLENGE_MESSAGE}\nDiagnostic report could not be saved.`, { cause: error });
-		}
-		throw new Error(`${CHALLENGE_MESSAGE}\nDiagnostic report: ${reportPath}`);
+		throw new Error("DuckDuckGo blocked the search with an anti-bot challenge");
 	}
 
-	const stderr =
-		!options.diagnostics && execution.stderr
-			? limitText(execution.stderr, formatTruncationNotice("Obscura stderr")).text
-			: undefined;
+	const stderr = execution.stderr
+		? limitText(execution.stderr, formatTruncationNotice("Obscura stderr")).text
+		: undefined;
 	return {
 		backend: "obscura",
 		searchUrl,

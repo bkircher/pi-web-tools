@@ -63,8 +63,8 @@ export function formatTruncationNotice(source: string, details?: string): string
 /**
  * Limits a complete text result, including its truncation notice.
  */
-export function limitText(content: string, notice: string, limits: Limits = {}): LimitedText {
-	const truncation = truncateHead(content, limits);
+export function limitText(content: string, notice: string): LimitedText {
+	const truncation = truncateHead(content);
 	if (!truncation.truncated) return { text: content, truncation };
 
 	const noticeBytes = Buffer.byteLength(notice, "utf8");

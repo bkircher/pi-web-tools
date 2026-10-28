@@ -24,7 +24,6 @@ type RequestBase = {
 	wait: number;
 	timeout: number;
 	proxy?: string;
-	verbose?: boolean;
 };
 
 export type Request = RequestBase &
@@ -61,7 +60,7 @@ export type Storage = {
 	removeWorkingDirectory(path: string): Promise<void>;
 };
 
-export type ExecuteOptions = {
+type ExecuteOptions = {
 	exec: Exec;
 	cwd: string;
 	signal?: AbortSignal;
@@ -92,8 +91,8 @@ const nodeStorage: Storage = {
 	removeWorkingDirectory: (path) => rm(path, { recursive: true, force: true }),
 };
 
-export function buildArgs(request: Request, outputPath: string): string[] {
-	const args = ["fetch", request.verbose ? "--verbose" : "--quiet", "--stealth"];
+function buildArgs(request: Request, outputPath: string): string[] {
+	const args = ["fetch", "--quiet", "--stealth"];
 	if (request.mode === "eval") {
 		args.push("--eval", request.script);
 	} else {

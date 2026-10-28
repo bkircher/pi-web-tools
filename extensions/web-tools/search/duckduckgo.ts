@@ -21,7 +21,7 @@ function isDuckDuckGoHost(hostname: string): boolean {
 	return hostname === "duckduckgo.com" || hostname.endsWith(".duckduckgo.com");
 }
 
-export function normalizeResultUrl(href: string): string | undefined {
+function normalizeResultUrl(href: string): string | undefined {
 	const normalizedHref = href.trim();
 	if (!normalizedHref) return undefined;
 

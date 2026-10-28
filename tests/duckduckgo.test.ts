@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-	normalizeResults as normalizeDuckDuckGoResults,
-	normalizeResultUrl,
-} from "../extensions/web-tools/search/duckduckgo.ts";
+import { normalizeResults as normalizeDuckDuckGoResults } from "../extensions/web-tools/search/duckduckgo.ts";
 
 test("normalizes result text and DuckDuckGo redirect URLs", () => {
 	const rawResults = [
@@ -28,17 +25,19 @@ test("normalizes result text and DuckDuckGo redirect URLs", () => {
 test("does not unwrap uddg parameters on non-DuckDuckGo URLs", () => {
 	const href = "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F";
 
-	const result = normalizeResultUrl(href);
+	const results = normalizeDuckDuckGoResults([{ title: "Example", href }]);
 
-	assert.equal(result, "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F");
+	assert.deepEqual(results, [{ title: "Example", url: "https://example.com/?uddg=https%3A%2F%2Fevil.example%2F" }]);
 });
 
 test("does not unwrap DuckDuckGo links outside the redirect path", () => {
 	const href = "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F";
 
-	const result = normalizeResultUrl(href);
+	const results = normalizeDuckDuckGoResults([{ title: "Example", href }]);
 
-	assert.equal(result, "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F");
+	assert.deepEqual(results, [
+		{ title: "Example", url: "https://duckduckgo.com/search/?uddg=https%3A%2F%2Fevil.example%2F" },
+	]);
 });
 
 test("omits duplicate, unsafe, and empty results", () => {

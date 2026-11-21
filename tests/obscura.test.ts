@@ -33,7 +33,13 @@ function createStorage(overrides: Partial<ObscuraStorage> = {}): ObscuraStorage 
 
 test("runs Obscura dump requests in quiet mode", async (context) => {
 	const storage = createStorage({ readOutputFile: () => scanOutput([]) });
-	const exec = context.mock.fn<ObscuraExec>(async () => ({ stdout: "", stderr: "", code: 0, killed: false }));
+	const exec = context.mock.fn<ObscuraExec>(async () => ({
+		stdout: "",
+		stderr: "",
+		code: 0,
+		killed: false,
+		truncated: false,
+	}));
 
 	await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -71,7 +77,13 @@ test("runs Obscura eval requests in quiet mode", async (context) => {
 		timeout: 10,
 	};
 	const storage = createStorage({ readOutputFile: () => scanOutput([]) });
-	const exec = context.mock.fn<ObscuraExec>(async () => ({ stdout: "", stderr: "", code: 0, killed: false }));
+	const exec = context.mock.fn<ObscuraExec>(async () => ({
+		stdout: "",
+		stderr: "",
+		code: 0,
+		killed: false,
+		truncated: false,
+	}));
 
 	await executeObscuraFetch(request, { exec, cwd: "/project", storage });
 
@@ -109,7 +121,7 @@ test("retains full output after truncation", async () => {
 			removedWorkingDirectory = path;
 		},
 	});
-	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false, truncated: false });
 
 	const result = await executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -127,7 +139,7 @@ test("propagates output file read errors", async () => {
 			throw readError;
 		},
 	});
-	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false, truncated: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -141,7 +153,7 @@ test("deletes the working directory when Obscura fails", async () => {
 			removedWorkingDirectory = path;
 		},
 	});
-	const exec = async () => ({ stdout: "", stderr: "navigation failed", code: 2, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "navigation failed", code: 2, killed: false, truncated: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -155,7 +167,7 @@ test("deletes the working directory when Obscura fails", async () => {
 
 test("limits Obscura failure diagnostics", async () => {
 	const storage = createStorage();
-	const exec = async () => ({ stdout: "", stderr: "a".repeat(100_000), code: 2, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "a".repeat(100_000), code: 2, killed: false, truncated: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -173,7 +185,7 @@ test("reports killed processes as timeouts", async () => {
 	const storage = createStorage();
 	const exec: ObscuraExec = async (_command, _args, options) => {
 		processTimeoutMs = options?.timeout;
-		return { stdout: "", stderr: "", code: 1, killed: true };
+		return { stdout: "", stderr: "", code: 143, killed: true, truncated: false };
 	};
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
@@ -189,7 +201,7 @@ test("reports killed processes as timeouts", async () => {
 
 test("reports exit code 124 as a timeout", async () => {
 	const storage = createStorage();
-	const exec = async () => ({ stdout: "", stderr: "hard timeout", code: 124, killed: false });
+	const exec = async () => ({ stdout: "", stderr: "hard timeout", code: 124, killed: false, truncated: false });
 
 	const result = executeObscuraFetch(dumpRequest, { exec, cwd: "/project", storage });
 
@@ -205,7 +217,7 @@ test("reports aborted processes as cancellation", async () => {
 	const controller = new AbortController();
 	controller.abort();
 	const storage = createStorage();
-	const exec = async () => ({ stdout: "", stderr: "", code: 1, killed: true });
+	const exec = async () => ({ stdout: "", stderr: "", code: 143, killed: true, truncated: false });
 
 	const result = executeObscuraFetch(dumpRequest, {
 		exec,

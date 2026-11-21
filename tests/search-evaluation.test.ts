@@ -5,7 +5,7 @@ import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/searc
 import type { Exec } from "../extensions/web-tools/shared/obscura.ts";
 import { scan } from "../extensions/web-tools/shared/output.ts";
 
-const unusedExec: Exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
+const unusedExec: Exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false, truncated: false });
 
 const resultLink = {
 	textContent: " Example ",

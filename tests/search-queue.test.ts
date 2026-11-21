@@ -9,7 +9,10 @@ import type { RunObscura } from "../extensions/web-tools/search/execute.ts";
 const toolContext = { cwd: "/project" } as ExtensionToolContext;
 
 function getSearchTool(runObscura: RunObscura) {
-	return createSearchTool({ exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }) }, { runObscura });
+	return createSearchTool(
+		{ exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false, truncated: false }) },
+		{ runObscura },
+	);
 }
 
 async function createExecution(title = "Example", href = "https://example.com/"): Promise<Execution> {

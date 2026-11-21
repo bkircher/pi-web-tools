@@ -29,7 +29,7 @@
 		"typebox": "*"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.6.3",
+		"@biomejs/biome": "2.6.8",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2"
 	},
@@ -38,7 +38,7 @@
 			"@smithy/node-http-handler": "4.13.0"
 		},
 		"@earendil-works/pi-coding-agent": {
-			"undici": "8.12.3"
+			"undici@8.12.3": "8.12.4"
 		},
 		"google-auth-library": {
 			"google-logging-utils": "1.2.0"

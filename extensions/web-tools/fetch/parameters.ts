@@ -13,6 +13,7 @@ const MAX_EVAL_LENGTH = 5000;
 const MAX_SELECTOR_LENGTH = 1000;
 const MAX_PROXY_LENGTH = 2048;
 
+// The published Pi StringEnum returns JSON Schema. Wrap it to preserve TypeBox's enum types.
 export const parameters = Type.Object({
 	url: Type.String({
 		description:
@@ -21,11 +22,13 @@ export const parameters = Type.Object({
 		maxLength: MAX_URL_LENGTH,
 	}),
 	dump: Type.Optional(
-		StringEnum(DUMP_MODES, {
-			description:
-				"Output format to dump when eval is not provided. markdown preserves headings and links while removing most HTML noise. assets returns NDJSON sub-resource URLs.",
-			default: DEFAULT_DUMP_MODE,
-		}),
+		Type.Unsafe<DumpMode>(
+			StringEnum(DUMP_MODES, {
+				description:
+					"Output format to dump when eval is not provided. markdown preserves headings and links while removing most HTML noise. assets returns NDJSON sub-resource URLs.",
+				default: DEFAULT_DUMP_MODE,
+			}),
+		),
 	),
 	eval: Type.Optional(
 		Type.String({
@@ -43,10 +46,12 @@ export const parameters = Type.Object({
 		}),
 	),
 	waitUntil: Type.Optional(
-		StringEnum(WAIT_UNTIL, {
-			description: "Navigation readiness condition before dumping or evaluating. Default: load",
-			default: DEFAULT_WAIT_UNTIL,
-		}),
+		Type.Unsafe<WaitUntil>(
+			StringEnum(WAIT_UNTIL, {
+				description: "Navigation readiness condition before dumping or evaluating. Default: load",
+				default: DEFAULT_WAIT_UNTIL,
+			}),
+		),
 	),
 	wait: Type.Optional(
 		Type.Integer({

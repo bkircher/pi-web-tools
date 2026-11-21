@@ -19,7 +19,7 @@ const theme = {
 
 const renderContext = { isError: false };
 
-function renderLines(component: { render(width: number): string[] }): string[] {
+function renderLines(component: { render(width: number): readonly string[] }): string[] {
 	return component.render(500).map((line) => line.trimEnd());
 }
 

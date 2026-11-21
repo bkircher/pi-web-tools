@@ -4,7 +4,7 @@ import { ObscuraError, type Exec } from "../extensions/web-tools/shared/obscura.
 import { searchDuckDuckGo, type RunObscura } from "../extensions/web-tools/search/execute.ts";
 import { scan as scanOutput } from "../extensions/web-tools/shared/output.ts";
 
-const unusedExec: Exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false });
+const unusedExec: Exec = async () => ({ stdout: "", stderr: "", code: 0, killed: false, truncated: false });
 
 const validEvaluation = {
 	pageUrl: "https://html.duckduckgo.com/html/?q=example",
